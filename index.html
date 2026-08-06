@@ -52,7 +52,7 @@ const SHORTCUT="Run Img2Video in a-Shell",SCRIPT="~File\\ Provider\\ Storage/img
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
 const D={imagePath:"~File\\ Provider\\ Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
 const $=x=>document.getElementById(x),val=n=>document.querySelector('input[name="'+n+'"]:checked')?.value||"",radio=(n,v)=>{const e=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(e)e.checked=true};
-const quote=s=>"'"+String(s).replace(/'/g,"'\"'\"'")+"'",path=s=>String(s).trim().replace(/([\\\s\"'`$&;|<>()[\]{}*?!#])/g,"\\$1");
+const quote=s=>"'"+String(s).replace(/'/g,"'\"'\"'")+"'",path=s=>String(s).trim();
 function state(){return{imagePath:$("imagePath").value.trim(),prompt:$("prompt").value.trim(),model:val("model"),resolution:val("resolution"),performance:val("performance"),fps:+$("fps").value,frames:+$("frames").value,priority:+$("priority").value,optimizations:$("optimizations").checked,interpolation:$("interpolation").checked}}
 function cmd(s){return["python",SCRIPT,path(s.imagePath),"--prompt",quote(s.prompt),"--model",s.model,"--resolution",s.resolution,"--performance",s.performance,"--fps",s.fps,"--frames",s.frames,"--priority",s.priority,s.optimizations?"--optimizations":"--no-optimizations",s.interpolation?"--interpolation":"--no-interpolation","--output",OUTPUT].join(" ")}
 function save(s){localStorage.setItem(KEY,JSON.stringify(s))}function load(){try{return{...D,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch{return{...D}}}
