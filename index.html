@@ -1,3 +1,4 @@
+<!-- VERSION$00004$ | Edited: 06/08 | TIME: 22:15 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -23,12 +24,10 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Choose an image for preview, confirm its a‑Shell path, then send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00001</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Enter the path of an image that already exists in the iOS Files filesystem and send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00004</span></header>
 <form id="form" class="stack">
 <section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">PATH REQUIRED</span></div><div class="body grid">
-<div class="source"><div id="preview" class="preview"><img id="previewImage"><div class="placeholder">Select an image</div><div id="sourceName" class="shade">No preview selected</div></div><div><input id="fileInput" class="file" type="file" accept="image/*"><button id="choose" class="btn" type="button">Choose image</button></div></div>
-<div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">Safari exposes only the filename</span></div><input id="imagePath" type="text" value="~File\ Provider\ Storage/"></div>
-</div></section>
+<div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">Image must already exist in Files</span></div><input id="imagePath" type="text" value="~File Provider Storage/" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">Example: ~File Provider Storage/Downloads/photo.jpg</div></div></div></section>
 <section class="card"><div class="head"><h2 class="title">Motion</h2><span id="promptCount" class="note"></span></div><div class="body"><textarea id="prompt">Static camera, subtle natural movement.</textarea></div></section>
 <section class="card"><div class="head"><h2 class="title">Generation</h2><span id="limits" class="note"></span></div><div class="body grid">
 <div class="field"><label>Model</label><div class="segment" style="--count:2"><input id="ltx" type="radio" name="model" value="ltx-2.3" checked><label for="ltx">LTX 2.3</label><input id="wan" type="radio" name="model" value="wan-2.2"><label for="wan">Wan 2.2</label></div></div>
@@ -48,20 +47,20 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <footer><div class="footerin"><button class="launch" type="submit" form="form">Launch Shortcut</button><span id="runStatus" class="pill ready">READY</span></div></footer>
 <script>
 (()=>{"use strict";
-const SHORTCUT="Run Img2Video in a-Shell",SCRIPT="~File\\ Provider\\ Storage/img2video_iphone.py",OUTPUT="~File\\ Provider\\ Storage/img2video_output.mp4",KEY="img2videoSafariV1";
+const SHORTCUT="Run Img2Video in a-Shell",SCRIPT="~File Provider Storage/img2video_iphone.py",OUTPUT="~File Provider Storage/img2video_output.mp4",KEY="img2videoSafariV2";
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
-const D={imagePath:"~File\\ Provider\\ Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
+const D={imagePath:"~File Provider Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
 const $=x=>document.getElementById(x),val=n=>document.querySelector('input[name="'+n+'"]:checked')?.value||"",radio=(n,v)=>{const e=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(e)e.checked=true};
-const quote=s=>"'"+String(s).replace(/'/g,"'\"'\"'")+"'",path=s=>String(s).trim();
+const quote=s=>"'"+String(s).replace(/'/g,"'\"'\"'")+"'";
+const path=s=>String(s).trim().replace(/\\ /g," ").replace(/([\s\\"'`$&;|<>()[\]{}*?!#])/g,"\\$1");
 function state(){return{imagePath:$("imagePath").value.trim(),prompt:$("prompt").value.trim(),model:val("model"),resolution:val("resolution"),performance:val("performance"),fps:+$("fps").value,frames:+$("frames").value,priority:+$("priority").value,optimizations:$("optimizations").checked,interpolation:$("interpolation").checked}}
-function cmd(s){return["python",SCRIPT,path(s.imagePath),"--prompt",quote(s.prompt),"--model",s.model,"--resolution",s.resolution,"--performance",s.performance,"--fps",s.fps,"--frames",s.frames,"--priority",s.priority,s.optimizations?"--optimizations":"--no-optimizations",s.interpolation?"--interpolation":"--no-interpolation","--output",OUTPUT].join(" ")}
+function cmd(s){return["python",path(SCRIPT),path(s.imagePath),"--prompt",quote(s.prompt),"--model",s.model,"--resolution",s.resolution,"--performance",s.performance,"--fps",s.fps,"--frames",s.frames,"--priority",s.priority,s.optimizations?"--optimizations":"--no-optimizations",s.interpolation?"--interpolation":"--no-interpolation","--output",path(OUTPUT)].join(" ")}
 function save(s){localStorage.setItem(KEY,JSON.stringify(s))}function load(){try{return{...D,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch{return{...D}}}
 function pair(r,n,min,max,fallback){const R=$(r),N=$(n);[R,N].forEach(e=>{e.min=min;e.max=max;e.step=1});const u=x=>{x=Math.min(Math.max(Math.round(+x||fallback),min),max);R.value=N.value=x;refresh()};R.oninput=()=>u(R.value);N.onchange=()=>u(N.value);u(N.value||fallback)}
 function limits(){const l=LIMITS[val("model")]||LIMITS["ltx-2.3"];$("fpsMin").textContent=l.fps[0];$("fpsMax").textContent=l.fps[1];$("framesMin").textContent=l.frames[0];$("framesMax").textContent=l.frames[1];$("limits").textContent=`${l.fps[0]}–${l.fps[1]} FPS · ${l.frames[0]}–${l.frames[1]} frames`;pair("fpsRange","fps",...l.fps,l.fps[1]);pair("framesRange","frames",...l.frames,l.frames[1])}
 function refresh(){const s=state();$("promptCount").textContent=s.prompt.length+" characters";$("command").textContent=cmd(s);const ok=s.imagePath&&!s.imagePath.endsWith("/");$("sourceStatus").textContent=ok?"PATH READY":"PATH REQUIRED";$("sourceStatus").className="pill"+(ok?" ready":"");save(s)}
 function restore(s){$("imagePath").value=s.imagePath;$("prompt").value=s.prompt;radio("model",s.model);radio("resolution",s.resolution);radio("performance",s.performance);$("fps").value=s.fps;$("frames").value=s.frames;$("priority").value=$("priorityRange").value=s.priority;$("optimizations").checked=s.optimizations;$("interpolation").checked=s.interpolation;limits();pair("priorityRange","priority",1,5,1);refresh()}
 function error(m){$("toast").textContent=m;$("toast").classList.add("show");$("runStatus").textContent="ERROR";$("runStatus").className="pill error"}function clear(){ $("toast").classList.remove("show");$("runStatus").textContent="READY";$("runStatus").className="pill ready"}
-$("choose").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>{const f=e.target.files?.[0];if(!f)return;$("previewImage").src=URL.createObjectURL(f);$("preview").classList.add("has");$("sourceName").textContent=f.name;const p=$("imagePath").value.trim();if(!p||p.endsWith("/"))$("imagePath").value=(p||D.imagePath)+f.name;refresh()};
 ["prompt","imagePath"].forEach(x=>$(x).oninput=refresh);document.querySelectorAll('input[name="resolution"],input[name="performance"]').forEach(e=>e.onchange=refresh);document.querySelectorAll('input[name="model"]').forEach(e=>e.onchange=()=>{limits();refresh()});["optimizations","interpolation"].forEach(x=>$(x).onchange=refresh);
 $("copy").onclick=async()=>{clear();try{await navigator.clipboard.writeText($("command").textContent);$("runStatus").textContent="COPIED"}catch{error("Press and hold the command to copy it.")}};
 $("reset").onclick=()=>{localStorage.removeItem(KEY);restore(D)};
