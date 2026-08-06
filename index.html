@@ -1,4 +1,4 @@
-<!-- VERSION$00004$ | Edited: 06/08 | TIME: 22:15 -->
+<!-- VERSION$00005$ | Edited: 06/08 | TIME: 22:19 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -24,7 +24,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Enter the path of an image that already exists in the iOS Files filesystem and send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00004</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Enter the path of an image that already exists in the iOS Files filesystem and send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00005</span></header>
 <form id="form" class="stack">
 <section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">PATH REQUIRED</span></div><div class="body grid">
 <div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">Image must already exist in Files</span></div><input id="imagePath" type="text" value="~File Provider Storage/" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">Example: ~File Provider Storage/Downloads/photo.jpg</div></div></div></section>
@@ -56,12 +56,13 @@ const path=s=>String(s).trim().replace(/\\ /g," ").replace(/([\s\\"'`$&;|<>()[\]
 function state(){return{imagePath:$("imagePath").value.trim(),prompt:$("prompt").value.trim(),model:val("model"),resolution:val("resolution"),performance:val("performance"),fps:+$("fps").value,frames:+$("frames").value,priority:+$("priority").value,optimizations:$("optimizations").checked,interpolation:$("interpolation").checked}}
 function cmd(s){return["python",path(SCRIPT),path(s.imagePath),"--prompt",quote(s.prompt),"--model",s.model,"--resolution",s.resolution,"--performance",s.performance,"--fps",s.fps,"--frames",s.frames,"--priority",s.priority,s.optimizations?"--optimizations":"--no-optimizations",s.interpolation?"--interpolation":"--no-interpolation","--output",path(OUTPUT)].join(" ")}
 function save(s){localStorage.setItem(KEY,JSON.stringify(s))}function load(){try{return{...D,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch{return{...D}}}
-function pair(r,n,min,max,fallback){const R=$(r),N=$(n);[R,N].forEach(e=>{e.min=min;e.max=max;e.step=1});const u=x=>{x=Math.min(Math.max(Math.round(+x||fallback),min),max);R.value=N.value=x;refresh()};R.oninput=()=>u(R.value);N.onchange=()=>u(N.value);u(N.value||fallback)}
+function pair(r,n,min,max,fallback){const R=$(r),N=$(n);[R,N].forEach(e=>{e.min=min;e.max=max;e.step=1});const u=x=>{x=Math.min(Math.max(Math.round(+x||fallback),min),max);R.value=N.value=x;refresh()};R.oninput=()=>u(R.value);N.oninput=()=>u(N.value);N.onchange=()=>u(N.value);u(N.value||fallback)}
 function limits(){const l=LIMITS[val("model")]||LIMITS["ltx-2.3"];$("fpsMin").textContent=l.fps[0];$("fpsMax").textContent=l.fps[1];$("framesMin").textContent=l.frames[0];$("framesMax").textContent=l.frames[1];$("limits").textContent=`${l.fps[0]}–${l.fps[1]} FPS · ${l.frames[0]}–${l.frames[1]} frames`;pair("fpsRange","fps",...l.fps,l.fps[1]);pair("framesRange","frames",...l.frames,l.frames[1])}
 function refresh(){const s=state();$("promptCount").textContent=s.prompt.length+" characters";$("command").textContent=cmd(s);const ok=s.imagePath&&!s.imagePath.endsWith("/");$("sourceStatus").textContent=ok?"PATH READY":"PATH REQUIRED";$("sourceStatus").className="pill"+(ok?" ready":"");save(s)}
 function restore(s){$("imagePath").value=s.imagePath;$("prompt").value=s.prompt;radio("model",s.model);radio("resolution",s.resolution);radio("performance",s.performance);$("fps").value=s.fps;$("frames").value=s.frames;$("priority").value=$("priorityRange").value=s.priority;$("optimizations").checked=s.optimizations;$("interpolation").checked=s.interpolation;limits();pair("priorityRange","priority",1,5,1);refresh()}
 function error(m){$("toast").textContent=m;$("toast").classList.add("show");$("runStatus").textContent="ERROR";$("runStatus").className="pill error"}function clear(){ $("toast").classList.remove("show");$("runStatus").textContent="READY";$("runStatus").className="pill ready"}
-["prompt","imagePath"].forEach(x=>$(x).oninput=refresh);document.querySelectorAll('input[name="resolution"],input[name="performance"]').forEach(e=>e.onchange=refresh);document.querySelectorAll('input[name="model"]').forEach(e=>e.onchange=()=>{limits();refresh()});["optimizations","interpolation"].forEach(x=>$(x).onchange=refresh);
+$("form").addEventListener("input",e=>{if(e.target.matches('input[name="model"]')){limits();return}refresh()});
+$("form").addEventListener("change",e=>{if(e.target.matches('input[name="model"]')){limits();return}refresh()});
 $("copy").onclick=async()=>{clear();try{await navigator.clipboard.writeText($("command").textContent);$("runStatus").textContent="COPIED"}catch{error("Press and hold the command to copy it.")}};
 $("reset").onclick=()=>{localStorage.removeItem(KEY);restore(D)};
 $("form").onsubmit=e=>{e.preventDefault();clear();const s=state();if(!s.imagePath||s.imagePath.endsWith("/"))return error("Enter the complete a-Shell image path.");if(!s.prompt)return error("Enter a motion prompt.");location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(cmd(s))};
