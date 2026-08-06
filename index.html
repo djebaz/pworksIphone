@@ -1,4 +1,4 @@
-<!-- VERSION$00026$ | Edited: 06/08 | TIME: 23:02 -->
+<!-- VERSION$00028$ | Edited: 06/08 | TIME: 23:42 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -24,11 +24,11 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, confirm the a‑Shell folder, then send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00026</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00028</span></header>
 <form id="form" class="stack">
-<section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">PATH REQUIRED</span></div><div class="body grid">
+<section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">FILE REQUIRED</span></div><div class="body grid">
 <div class="source"><div id="preview" class="preview"><img id="previewImage" alt=""><div class="placeholder">Select an image</div><div id="sourceName" class="shade">No image selected</div></div><div><input id="fileInput" class="file" type="file" accept="image/*"><button id="choose" class="btn" type="button">Choose image</button></div></div>
-<div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">The picker supplies the filename only</span></div><input id="imagePath" type="text" value="~File Provider Storage/" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">Choose a file already stored in a folder accessible to a‑Shell, then confirm this full path.</div></div>
+<div class="field"><div class="row"><label for="imagePath">Selected image</label><span class="help">Only the filename is sent</span></div><input id="imagePath" type="text" value="" placeholder="Choose an image" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">The Shortcut searches this filename in Files first, then Photos. After it resolves a usable path, it inserts that path into the command.</div></div>
 </div></section>
 <section class="card"><div class="head"><h2 class="title">Motion</h2><span id="promptCount" class="note"></span></div><div class="body"><textarea id="prompt">Static camera, subtle natural movement.</textarea></div></section>
 <section class="card"><div class="head"><h2 class="title">Generation</h2><span id="limits" class="note"></span></div><div class="body grid">
@@ -43,7 +43,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <div class="switchrow"><div><strong>Optimizations</strong><small>--optimizations / --no-optimizations</small></div><label class="switch"><input id="optimizations" type="checkbox"><span class="track"></span></label></div>
 <div class="switchrow"><div><strong>Interpolation</strong><small>--interpolation / --no-interpolation</small></div><label class="switch"><input id="interpolation" type="checkbox"><span class="track"></span></label></div>
 </div></section>
-<section class="card"><div class="head"><h2 class="title">Command</h2><span class="note">One physical line</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
+<section class="card"><div class="head"><h2 class="title">Command</h2><span class="note">filename + cmd sent as JSON</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
 </form>
 </main>
 <footer><div class="footerin"><button class="launch" type="submit" form="form">Launch Shortcut</button><span id="runStatus" class="pill ready">READY</span></div></footer>
@@ -54,7 +54,7 @@ const SCRIPT="~File Provider Storage/img2video_iphone.py";
 const OUTPUT="~File Provider Storage/img2video_output.mp4";
 const KEY="img2videoSafariV3";
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
-const DEFAULTS={imagePath:"~File Provider Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
+const DEFAULTS={imagePath:"",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
 const $=id=>document.getElementById(id);
 const selectedValue=name=>document.querySelector(`input[name="${name}"]:checked`)?.value||"";
 const selectRadio=(name,value)=>{const item=document.querySelector(`input[name="${name}"][value="${value}"]`);if(item)item.checked=true};
@@ -99,7 +99,7 @@ function directory(value){
 function state(){
   return{
     imagePath:readablePath($("imagePath").value),
-    prompt:$("prompt").value.trim(),
+    prompt:$("prompt").value.replace(/[\r\n]+/g," ").trim(),
     model:selectedValue("model"),
     resolution:selectedValue("resolution"),
     performance:selectedValue("performance"),
@@ -113,7 +113,7 @@ function state(){
 
 function command(current){
   return[
-    "python",shellPath(SCRIPT),shellPath(current.imagePath),
+    "python",shellPath(SCRIPT),
     "--prompt",quote(current.prompt),
     "--model",current.model,
     "--resolution",current.resolution,
@@ -125,6 +125,14 @@ function command(current){
     current.interpolation?"--interpolation":"--no-interpolation",
     "--output",shellPath(OUTPUT)
   ].join(" ");
+}
+
+function shortcutPayload(current){
+  return JSON.stringify({
+    version:1,
+    filename:basename(current.imagePath),
+    cmd:command(current)
+  });
 }
 
 function save(current){
@@ -179,7 +187,7 @@ function refresh(){
   $("promptCount").textContent=current.prompt.length+" characters";
   $("command").textContent=command(current);
   const ready=Boolean(current.imagePath&&basename(current.imagePath));
-  $("sourceStatus").textContent=ready?"PATH READY":"PATH REQUIRED";
+  $("sourceStatus").textContent=ready?"FILE READY":"FILE REQUIRED";
   $("sourceStatus").className="pill"+(ready?" ready":"");
   if(!previewUrl)$("sourceName").textContent=ready?basename(current.imagePath):"No image selected";
   save(current);
@@ -224,9 +232,9 @@ $("fileInput").addEventListener("change",event=>{
   $("previewImage").src=previewUrl;
   $("preview").classList.add("has");
   $("sourceName").textContent=file.name;
-  $("imagePath").value=directory($("imagePath").value)+file.name;
+  $("imagePath").value=file.name;
   clearStatus();
-  $("toast").textContent="Filename inserted. Confirm that the folder path is accessible to a‑Shell.";
+  $("toast").textContent="Filename selected. The Shortcut will resolve its path in Files or Photos.";
   $("toast").classList.add("show");
   refresh();
 });
@@ -266,9 +274,9 @@ $("form").addEventListener("submit",event=>{
   event.preventDefault();
   clearStatus();
   const current=state();
-  if(!current.imagePath||!basename(current.imagePath))return showError("Choose an image or enter its complete a‑Shell path.");
+  if(!basename(current.imagePath))return showError("Choose an image or enter its filename.");
   if(!current.prompt)return showError("Enter a motion prompt.");
-  location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(command(current));
+  location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(shortcutPayload(current));
 });
 
 window.addEventListener("pagehide",()=>{if(previewUrl)URL.revokeObjectURL(previewUrl)});
