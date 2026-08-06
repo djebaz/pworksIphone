@@ -1,4 +1,4 @@
-<!-- VERSION$00005$ | Edited: 06/08 | TIME: 22:19 -->
+<!-- VERSION$00026$ | Edited: 06/08 | TIME: 23:02 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -24,10 +24,12 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Enter the path of an image that already exists in the iOS Files filesystem and send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00005</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, confirm the a‑Shell folder, then send one complete command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00026</span></header>
 <form id="form" class="stack">
 <section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">PATH REQUIRED</span></div><div class="body grid">
-<div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">Image must already exist in Files</span></div><input id="imagePath" type="text" value="~File Provider Storage/" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">Example: ~File Provider Storage/Downloads/photo.jpg</div></div></div></section>
+<div class="source"><div id="preview" class="preview"><img id="previewImage" alt=""><div class="placeholder">Select an image</div><div id="sourceName" class="shade">No image selected</div></div><div><input id="fileInput" class="file" type="file" accept="image/*"><button id="choose" class="btn" type="button">Choose image</button></div></div>
+<div class="field"><div class="row"><label for="imagePath">a‑Shell image path</label><span class="help">The picker supplies the filename only</span></div><input id="imagePath" type="text" value="~File Provider Storage/" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left">Choose a file already stored in a folder accessible to a‑Shell, then confirm this full path.</div></div>
+</div></section>
 <section class="card"><div class="head"><h2 class="title">Motion</h2><span id="promptCount" class="note"></span></div><div class="body"><textarea id="prompt">Static camera, subtle natural movement.</textarea></div></section>
 <section class="card"><div class="head"><h2 class="title">Generation</h2><span id="limits" class="note"></span></div><div class="body grid">
 <div class="field"><label>Model</label><div class="segment" style="--count:2"><input id="ltx" type="radio" name="model" value="ltx-2.3" checked><label for="ltx">LTX 2.3</label><input id="wan" type="radio" name="model" value="wan-2.2"><label for="wan">Wan 2.2</label></div></div>
@@ -47,25 +49,229 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <footer><div class="footerin"><button class="launch" type="submit" form="form">Launch Shortcut</button><span id="runStatus" class="pill ready">READY</span></div></footer>
 <script>
 (()=>{"use strict";
-const SHORTCUT="Run Img2Video in a-Shell",SCRIPT="~File Provider Storage/img2video_iphone.py",OUTPUT="~File Provider Storage/img2video_output.mp4",KEY="img2videoSafariV2";
+const SHORTCUT="Run Img2Video in a-Shell";
+const SCRIPT="~File Provider Storage/img2video_iphone.py";
+const OUTPUT="~File Provider Storage/img2video_output.mp4";
+const KEY="img2videoSafariV3";
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
-const D={imagePath:"~File Provider Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
-const $=x=>document.getElementById(x),val=n=>document.querySelector('input[name="'+n+'"]:checked')?.value||"",radio=(n,v)=>{const e=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(e)e.checked=true};
-const quote=s=>"'"+String(s).replace(/'/g,"'\"'\"'")+"'";
-const path=s=>String(s).trim().replace(/\\ /g," ").replace(/([\s\\"'`$&;|<>()[\]{}*?!#])/g,"\\$1");
-function state(){return{imagePath:$("imagePath").value.trim(),prompt:$("prompt").value.trim(),model:val("model"),resolution:val("resolution"),performance:val("performance"),fps:+$("fps").value,frames:+$("frames").value,priority:+$("priority").value,optimizations:$("optimizations").checked,interpolation:$("interpolation").checked}}
-function cmd(s){return["python",path(SCRIPT),path(s.imagePath),"--prompt",quote(s.prompt),"--model",s.model,"--resolution",s.resolution,"--performance",s.performance,"--fps",s.fps,"--frames",s.frames,"--priority",s.priority,s.optimizations?"--optimizations":"--no-optimizations",s.interpolation?"--interpolation":"--no-interpolation","--output",path(OUTPUT)].join(" ")}
-function save(s){localStorage.setItem(KEY,JSON.stringify(s))}function load(){try{return{...D,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch{return{...D}}}
-function pair(r,n,min,max,fallback){const R=$(r),N=$(n);[R,N].forEach(e=>{e.min=min;e.max=max;e.step=1});const u=x=>{x=Math.min(Math.max(Math.round(+x||fallback),min),max);R.value=N.value=x;refresh()};R.oninput=()=>u(R.value);N.oninput=()=>u(N.value);N.onchange=()=>u(N.value);u(N.value||fallback)}
-function limits(){const l=LIMITS[val("model")]||LIMITS["ltx-2.3"];$("fpsMin").textContent=l.fps[0];$("fpsMax").textContent=l.fps[1];$("framesMin").textContent=l.frames[0];$("framesMax").textContent=l.frames[1];$("limits").textContent=`${l.fps[0]}–${l.fps[1]} FPS · ${l.frames[0]}–${l.frames[1]} frames`;pair("fpsRange","fps",...l.fps,l.fps[1]);pair("framesRange","frames",...l.frames,l.frames[1])}
-function refresh(){const s=state();$("promptCount").textContent=s.prompt.length+" characters";$("command").textContent=cmd(s);const ok=s.imagePath&&!s.imagePath.endsWith("/");$("sourceStatus").textContent=ok?"PATH READY":"PATH REQUIRED";$("sourceStatus").className="pill"+(ok?" ready":"");save(s)}
-function restore(s){$("imagePath").value=s.imagePath;$("prompt").value=s.prompt;radio("model",s.model);radio("resolution",s.resolution);radio("performance",s.performance);$("fps").value=s.fps;$("frames").value=s.frames;$("priority").value=$("priorityRange").value=s.priority;$("optimizations").checked=s.optimizations;$("interpolation").checked=s.interpolation;limits();pair("priorityRange","priority",1,5,1);refresh()}
-function error(m){$("toast").textContent=m;$("toast").classList.add("show");$("runStatus").textContent="ERROR";$("runStatus").className="pill error"}function clear(){ $("toast").classList.remove("show");$("runStatus").textContent="READY";$("runStatus").className="pill ready"}
-$("form").addEventListener("input",e=>{if(e.target.matches('input[name="model"]')){limits();return}refresh()});
-$("form").addEventListener("change",e=>{if(e.target.matches('input[name="model"]')){limits();return}refresh()});
-$("copy").onclick=async()=>{clear();try{await navigator.clipboard.writeText($("command").textContent);$("runStatus").textContent="COPIED"}catch{error("Press and hold the command to copy it.")}};
-$("reset").onclick=()=>{localStorage.removeItem(KEY);restore(D)};
-$("form").onsubmit=e=>{e.preventDefault();clear();const s=state();if(!s.imagePath||s.imagePath.endsWith("/"))return error("Enter the complete a-Shell image path.");if(!s.prompt)return error("Enter a motion prompt.");location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(cmd(s))};
+const DEFAULTS={imagePath:"~File Provider Storage/",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
+const $=id=>document.getElementById(id);
+const selectedValue=name=>document.querySelector(`input[name="${name}"]:checked`)?.value||"";
+const selectRadio=(name,value)=>{const item=document.querySelector(`input[name="${name}"][value="${value}"]`);if(item)item.checked=true};
+const quote=value=>"'"+String(value).replace(/'/g,"'\"'\"'")+"'";
+const PATH_SPECIAL=new Set([" ","\t","\n","\\","\"","'","`","$","&",";","|","<",">","(",")","[","]","{","}","*","?","!","#"]);
+let previewUrl="";
+let selectedFileName="";
+
+function readablePath(value){
+  const source=String(value??"").trim();
+  let output="";
+  for(let i=0;i<source.length;){
+    if(source[i]!=="\\"){output+=source[i++];continue}
+    let j=i;
+    while(j<source.length&&source[j]==="\\")j++;
+    if(j<source.length&&PATH_SPECIAL.has(source[j])){output+=source[j];i=j+1;continue}
+    output+=source.slice(i,j);i=j;
+  }
+  return output;
+}
+
+function shellPath(value){
+  let output="";
+  for(const character of readablePath(value))output+=PATH_SPECIAL.has(character)?"\\"+character:character;
+  return output;
+}
+
+function basename(value){
+  const path=readablePath(value);
+  if(!path||path.endsWith("/"))return"";
+  return path.slice(path.lastIndexOf("/")+1);
+}
+
+function directory(value){
+  const path=readablePath(value);
+  if(!path)return DEFAULTS.imagePath;
+  if(path.endsWith("/"))return path;
+  const slash=path.lastIndexOf("/");
+  return slash>=0?path.slice(0,slash+1):DEFAULTS.imagePath;
+}
+
+function state(){
+  return{
+    imagePath:readablePath($("imagePath").value),
+    prompt:$("prompt").value.trim(),
+    model:selectedValue("model"),
+    resolution:selectedValue("resolution"),
+    performance:selectedValue("performance"),
+    fps:Number($("fps").value),
+    frames:Number($("frames").value),
+    priority:Number($("priority").value),
+    optimizations:$("optimizations").checked,
+    interpolation:$("interpolation").checked
+  };
+}
+
+function command(current){
+  return[
+    "python",shellPath(SCRIPT),shellPath(current.imagePath),
+    "--prompt",quote(current.prompt),
+    "--model",current.model,
+    "--resolution",current.resolution,
+    "--performance",current.performance,
+    "--fps",current.fps,
+    "--frames",current.frames,
+    "--priority",current.priority,
+    current.optimizations?"--optimizations":"--no-optimizations",
+    current.interpolation?"--interpolation":"--no-interpolation",
+    "--output",shellPath(OUTPUT)
+  ].join(" ");
+}
+
+function save(current){
+  try{localStorage.setItem(KEY,JSON.stringify(current))}catch{}
+}
+
+function load(){
+  try{return{...DEFAULTS,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch{return{...DEFAULTS}}
+}
+
+function clamp(value,min,max,fallback){
+  const number=Number(value);
+  if(!Number.isFinite(number))return fallback;
+  return Math.min(max,Math.max(min,Math.round(number)));
+}
+
+function syncPair(rangeId,numberId,value,min,max,fallback){
+  const finalValue=clamp(value,min,max,fallback);
+  const range=$(rangeId),number=$(numberId);
+  for(const field of[range,number]){field.min=min;field.max=max;field.step=1}
+  range.value=number.value=finalValue;
+}
+
+function applyModelLimits(){
+  const limits=LIMITS[selectedValue("model")]||LIMITS[DEFAULTS.model];
+  syncPair("fpsRange","fps",$("fps").value,...limits.fps,limits.fps[1]);
+  syncPair("framesRange","frames",$("frames").value,...limits.frames,limits.frames[1]);
+  $("fpsMin").textContent=limits.fps[0];
+  $("fpsMax").textContent=limits.fps[1];
+  $("framesMin").textContent=limits.frames[0];
+  $("framesMax").textContent=limits.frames[1];
+  $("limits").textContent=`${limits.fps[0]}–${limits.fps[1]} FPS · ${limits.frames[0]}–${limits.frames[1]} frames`;
+}
+
+function clearPreview(label="No image selected"){
+  if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=""}
+  selectedFileName="";
+  $("previewImage").removeAttribute("src");
+  $("preview").classList.remove("has");
+  $("sourceName").textContent=label;
+  $("fileInput").value="";
+}
+
+function syncPreviewToPath(){
+  if(!selectedFileName)return;
+  if(basename($("imagePath").value)!==selectedFileName)clearPreview("Path changed · choose image again for preview");
+}
+
+function refresh(){
+  const current=state();
+  $("imagePath").value=current.imagePath;
+  $("promptCount").textContent=current.prompt.length+" characters";
+  $("command").textContent=command(current);
+  const ready=Boolean(current.imagePath&&basename(current.imagePath));
+  $("sourceStatus").textContent=ready?"PATH READY":"PATH REQUIRED";
+  $("sourceStatus").className="pill"+(ready?" ready":"");
+  if(!previewUrl)$("sourceName").textContent=ready?basename(current.imagePath):"No image selected";
+  save(current);
+}
+
+function restore(saved){
+  $("imagePath").value=readablePath(saved.imagePath||DEFAULTS.imagePath);
+  $("prompt").value=saved.prompt;
+  selectRadio("model",saved.model);
+  selectRadio("resolution",saved.resolution);
+  selectRadio("performance",saved.performance);
+  $("fps").value=saved.fps;
+  $("frames").value=saved.frames;
+  syncPair("priorityRange","priority",saved.priority,1,5,1);
+  $("optimizations").checked=Boolean(saved.optimizations);
+  $("interpolation").checked=Boolean(saved.interpolation);
+  applyModelLimits();
+  clearPreview(basename(saved.imagePath)||"No image selected");
+  refresh();
+}
+
+function showError(message){
+  $("toast").textContent=message;
+  $("toast").classList.add("show");
+  $("runStatus").textContent="ERROR";
+  $("runStatus").className="pill error";
+}
+
+function clearStatus(){
+  $("toast").classList.remove("show");
+  $("runStatus").textContent="READY";
+  $("runStatus").className="pill ready";
+}
+
+$("choose").addEventListener("click",()=>$("fileInput").click());
+$("fileInput").addEventListener("change",event=>{
+  const file=event.target.files?.[0];
+  if(!file)return;
+  if(previewUrl)URL.revokeObjectURL(previewUrl);
+  previewUrl=URL.createObjectURL(file);
+  selectedFileName=file.name;
+  $("previewImage").src=previewUrl;
+  $("preview").classList.add("has");
+  $("sourceName").textContent=file.name;
+  $("imagePath").value=directory($("imagePath").value)+file.name;
+  clearStatus();
+  $("toast").textContent="Filename inserted. Confirm that the folder path is accessible to a‑Shell.";
+  $("toast").classList.add("show");
+  refresh();
+});
+
+$("form").addEventListener("input",event=>{
+  const target=event.target;
+  if(target.id==="fileInput")return;
+  if(target.name==="model")applyModelLimits();
+  if(target.id==="fpsRange")syncPair("fpsRange","fps",target.value,Number(target.min),Number(target.max),24);
+  if(target.id==="fps")syncPair("fpsRange","fps",target.value,Number(target.min),Number(target.max),24);
+  if(target.id==="framesRange")syncPair("framesRange","frames",target.value,Number(target.min),Number(target.max),360);
+  if(target.id==="frames")syncPair("framesRange","frames",target.value,Number(target.min),Number(target.max),360);
+  if(target.id==="priorityRange")syncPair("priorityRange","priority",target.value,1,5,1);
+  if(target.id==="priority")syncPair("priorityRange","priority",target.value,1,5,1);
+  if(target.id==="imagePath")syncPreviewToPath();
+  refresh();
+});
+
+$("form").addEventListener("change",event=>{
+  if(event.target.id==="fileInput")return;
+  if(event.target.name==="model")applyModelLimits();
+  refresh();
+});
+
+$("copy").addEventListener("click",async()=>{
+  clearStatus();
+  try{await navigator.clipboard.writeText($("command").textContent);$("runStatus").textContent="COPIED"}
+  catch{showError("Press and hold the command to copy it.")}
+});
+
+$("reset").addEventListener("click",()=>{
+  try{localStorage.removeItem(KEY)}catch{}
+  restore(DEFAULTS);
+});
+
+$("form").addEventListener("submit",event=>{
+  event.preventDefault();
+  clearStatus();
+  const current=state();
+  if(!current.imagePath||!basename(current.imagePath))return showError("Choose an image or enter its complete a‑Shell path.");
+  if(!current.prompt)return showError("Enter a motion prompt.");
+  location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(command(current));
+});
+
+window.addEventListener("pagehide",()=>{if(previewUrl)URL.revokeObjectURL(previewUrl)});
 restore(load());
 })();
 </script>
