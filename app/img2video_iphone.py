@@ -1,4 +1,4 @@
-# VERSION$00050$ | Edited: 07/08 | TIME: 08:00
+# VERSION$00052$ | Edited: 07/08 | TIME: 08:21
 """Generate a video from a local image with the ArtWorks API.
 
 Designed for a-Shell Mini on iPhone. Uses only Python's standard library.
@@ -1068,6 +1068,11 @@ def validate_interpolation_fps(value, source: str = "interpolationFps") -> int:
         requested = int(value)
     except (TypeError, ValueError):
         raise RuntimeError(f"{source} must be an integer, not {value!r}. Documented values are {accepted}.")
+    # int(30.8) silently truncates to 30, which would contradict "the exact
+    # requested value is returned unchanged" above for a non-whole float, e.g.
+    # a malformed recovery-state JSON number.
+    if isinstance(value, float) and not value.is_integer():
+        raise RuntimeError(f"{source} must be an integer, not {value!r}. Documented values are {accepted}.")
     if requested not in SUPPORTED_INTERPOLATION_FPS:
         raise RuntimeError(f"{source} must be one of {accepted}, not {requested}.")
     return requested
@@ -1413,12 +1418,13 @@ def parse_args():
     default_frames = "160" if model == "wan-2.2" else "360"
     fps = parse_int(settings.get("fps", default_fps), "fps", 8, 24)
     frames = parse_int(settings.get("numFrames", default_frames), "numFrames", 24, 361)
-    # interpolationFps is a documented target independent of the selected model,
-    # so it is validated against the public enum here rather than against a
-    # model-derived default.
-    interpolation_fps = validate_interpolation_fps(
-        settings.get("interpolationFps", str(DEFAULT_INTERPOLATION_FPS))
-    )
+    # Deliberately not validated yet: interpolationFps is a stored preference
+    # that only matters once interpolation is actually requested (enabled, or
+    # --interpolate given explicitly on the command line). Whether that is the
+    # case is only known after full argument parsing below, so an inactive
+    # preference here is not validated and cannot abort a run that would never
+    # transmit it.
+    interpolation_fps_configured = settings.get("interpolationFps", str(DEFAULT_INTERPOLATION_FPS))
 
     if settings.get("priority"):
         priority = parse_int(settings["priority"], "priority", 1, 5)
@@ -1502,12 +1508,18 @@ def parse_args():
         help="enable interpolation (applyInterpolation); runtime effect remains unverified",
     )
     parser.add_argument(
-        "--interpolate", dest="interpolation_fps", type=int,
-        choices=SUPPORTED_INTERPOLATION_FPS, default=interpolation_fps, metavar="FPS",
+        # Deliberately type=str with no choices: the settings-sourced default
+        # must not be forced through int()/choices at parse time (argparse
+        # applies both to a string default), because an inactive interpolation
+        # preference must not abort argument parsing. validate_interpolation_fps
+        # runs explicitly below once whether interpolation is active is known.
+        "--interpolate", dest="interpolation_fps", type=str,
+        default=interpolation_fps_configured, metavar="FPS",
         help=(
             "interpolation target FPS; documented enum 24, 25, 30, 50, 60 (default "
-            "24). Also enables interpolation when supplied. Runtime support within "
-            "this enum has conflicting path-specific evidence (see AGENTS.md)."
+            "24). Also enables interpolation when supplied, even together with "
+            "--no-interpolation. Runtime support within this enum has conflicting "
+            "path-specific evidence (see AGENTS.md)."
         ),
     )
     parser.add_argument(
@@ -1706,11 +1718,12 @@ def parse_args():
         raise RuntimeError(
             "promotePriorityTo must be numerically lower (higher priority) than priority"
         )
-    # Stored/settings-derived values are already validated above; --interpolate is
-    # already constrained by argparse choices. This call is a defense-in-depth
-    # check, not a place where the value can still be silently rewritten.
-    args.interpolation_fps = validate_interpolation_fps(args.interpolation_fps)
     if args.interpolation:
+        # args.interpolation is already True here whenever --interpolate was
+        # given explicitly (forced above), so this covers both "interpolation
+        # enabled" and "an explicit target was requested". Only now is the
+        # value actually going to reach the API, so only now is it validated.
+        args.interpolation_fps = validate_interpolation_fps(args.interpolation_fps)
         # args.fps is the generation request FPS, not the native/output FPS that
         # interpolation would actually act on, so it cannot be used to predict
         # whether this target adds or discards frames.
@@ -1719,6 +1732,16 @@ def parse_args():
             f"{', '.join(str(rate) for rate in SUPPORTED_INTERPOLATION_FPS)} enum has "
             "conflicting path-specific evidence; the downloaded MP4 will be measured."
         )
+    else:
+        # Interpolation is inactive, so this stored preference will never reach
+        # the API. Keep it as a best-effort integer for generation_parameters()
+        # and recovery state without aborting the run over a value it will
+        # never transmit; an unusable value only becomes an error once
+        # interpolation is actually turned on.
+        try:
+            args.interpolation_fps = int(args.interpolation_fps)
+        except (TypeError, ValueError):
+            args.interpolation_fps = DEFAULT_INTERPOLATION_FPS
 
     args.tags = list(args.tag if args.tag is not None else settings.get("tag", []))
     args.loras = [parse_lora(value) for value in args.lora] if args.lora else settings.get("lora", [])
@@ -2851,10 +2874,19 @@ def normalize_recovery_parameters(state: dict, args) -> None:
         parameters.setdefault("interpolationFps", DEFAULT_INTERPOLATION_FPS)
         # A resumed run reuses these stored parameters verbatim instead of the
         # freshly parsed CLI values. interpolationFps is validated against the
-        # current documented enum, not silently rewritten to a model-derived value.
-        parameters["interpolationFps"] = validate_interpolation_fps(
-            parameters["interpolationFps"], source="recovery-state interpolationFps"
-        )
+        # current documented enum, not silently rewritten to a model-derived
+        # value -- but only when applyInterpolation is actually true, so an
+        # inactive stored preference that will never reach the API cannot block
+        # resuming an otherwise-valid recovery state.
+        if parameters.get("applyInterpolation"):
+            parameters["interpolationFps"] = validate_interpolation_fps(
+                parameters["interpolationFps"], source="recovery-state interpolationFps"
+            )
+        else:
+            try:
+                parameters["interpolationFps"] = int(parameters["interpolationFps"])
+            except (TypeError, ValueError):
+                parameters["interpolationFps"] = DEFAULT_INTERPOLATION_FPS
         parameters.setdefault("loras", [])
         parameters.pop("isFast", None)
     if warned_model:
