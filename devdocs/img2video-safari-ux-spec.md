@@ -1,4 +1,4 @@
-<!-- VERSION$00061$ | Edited: 07/08 | TIME: 10:25 -->
+<!-- VERSION$00067$ | Edited: 07/08 | TIME: 10:42 -->
 # Img2Video Safari UX Spec
 
 Canonical UX specification for `shortcuts/img2video/index.html`, the Safari-facing launcher that hands a `{filename, cmd}` payload to the `Run Img2Video in a-Shell` Shortcut. This document describes the current, shipped behavior; if the UI and this spec ever disagree, treat the UI as a bug against this spec (or file a spec update alongside the fix) rather than assuming either side is silently authoritative.
@@ -25,7 +25,7 @@ Sections appear in this fixed order and must not be reordered:
 ## Preset behavior
 
 - The preset dropdown is populated from `presets.txt` (see `img2video-presets-settings-contract.md`), fetched at load time.
-- Selecting a preset applies only the nine generation/processing fields (`model`, `resolution`, `performance`, `fps`, `frames`, `priority`, `optimizations`, `interpolation`, `interpolationFps`). It never touches the source image, filename, motion prompts, generation mode, combine-videos, max-parallel-tasks, output directory, or play-on-finish.
+- Selecting a preset applies only the nine generation/processing fields (`model`, `resolution`, `performance`, `fps`, `frames`, `priority`, `optimizations`, `interpolation`, `interpolationFps`). It never touches the source image, filename, motion prompts, generation mode, combine-videos, max-parallel-tasks, or play-on-finish.
 - "Custom" is a derived label, not a stored entry: whenever the current generation/processing fields don't exactly match any loaded preset, the dropdown shows "Custom" and the helper text reads "No preset matches current settings". There is no UI to create, save, rename, or delete a preset.
 - "Import settings.txt" reads a local `key=value` file and applies only the same nine generation/processing keys it recognizes (see the settings contract doc for the exact key list). It does not import prompts, execution settings, or motion/multi-prompt fields, even though those keys exist in the real `artworks_settings.txt` consumed directly by the Python client.
 
@@ -82,13 +82,14 @@ Unchanged: `Optimizations` and `Interpolation` toggles (`--optimizations`/`--no-
 
 New section for local run preferences that are never part of a preset or `settings.txt` import:
 
-- **Output directory (optional)**: a plain text field. Empty means the `--output` flag is omitted entirely, so the Python client falls back to its own default (`<photo-name>_video.mp4` beside the source image). A non-empty value is joined with the fixed output filename `img2video_output.mp4` and passed explicitly as `--output <dir>/img2video_output.mp4`.
 - **Play result when finished**: an amber toggle, same visual language as every other switch. When ON it appends `--sound` (the Python client's actual play-on-completion flag, exposed as `-s`/`--sound`) to the generated command. There is no `--open-video` flag in the Python client; the UI's helper text names the real flag it sends.
+
+An output-directory control was deliberately **not** added. iOS Safari has no API that lets a web page open a native folder picker and get back a real filesystem path — no File System Access API (`showDirectoryPicker`), and `<input webkitdirectory>` is unsupported there too (unlike the existing "Choose image" button, which only ever needed a *filename*, not a real path, because the Shortcut re-resolves it in Files/Photos). A manually-typed directory text field would look like a picker without behaving like one, so `--output` is always omitted and the Python client's own default (`<photo-name>_video.mp4` beside the source image) applies. If real folder selection is ever wanted, it belongs in the Shortcut itself (which does have genuine Files access), not in this Safari page.
 
 ## Command preview
 
 - Rebuilt from the live form state on every change; nothing here is hand-typed.
-- Multi-prompt runs render one repeated `--prompt '...'` argument per configured prompt, in list order, followed by the generation/processing flags, then (only for 2+ prompts) `--mode`, `--combine-videos`/`--no-combine-videos`, and (only in Parallel with 2+ prompts) `--max-parallel-tasks`, then the optional `--output` and `--sound` flags.
+- Multi-prompt runs render one repeated `--prompt '...'` argument per configured prompt, in list order, followed by the generation/processing flags, then (only for 2+ prompts) `--mode`, `--combine-videos`/`--no-combine-videos`, and (only in Parallel with 2+ prompts) `--max-parallel-tasks`, then the optional `--sound` flag.
 - The preview text wraps one argument group per line for readability. This is a *display-only* transform: the underlying command actually sent to the Shortcut (via Copy and via Launch) is always a single space-joined shell line — no real newlines are ever embedded in the executed command, so pasting it into a-Shell or letting the Shortcut run it behaves identically to a single-line command.
 - `Copy command` copies that single-line functional command (not the multi-line display text) to the clipboard.
 - `Reset` clears the persisted working state (`localStorage`), clears any legacy state/preset cache keys still lying around from earlier UI versions, reloads `presets.txt`, and restores every field — including the prompt list and Execution fields — to defaults.

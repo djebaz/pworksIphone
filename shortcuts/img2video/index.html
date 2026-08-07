@@ -1,4 +1,4 @@
-<!-- VERSION$00060$ | Edited: 07/08 | TIME: 10:20 -->
+<!-- VERSION$00066$ | Edited: 07/08 | TIME: 10:41 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -58,7 +58,7 @@ label{font-size:12px;font-weight:750}.help{color:var(--text-muted);font-size:10p
 textarea,input[type=text],input[type=number]{width:100%;border:1px solid rgba(157,129,243,.24);border-radius:9px;outline:none;background:rgba(255,255,255,.045);color:var(--text-main);caret-color:var(--accent-1)}
 textarea{min-height:100px;padding:11px 12px;font-size:14px;line-height:1.4;font-family:var(--font-main)}
 input[type=text]{min-height:36px;padding:7px 9px;font:11px var(--font-mono)}
-#imagePath,#outputDir{border-radius:8px}
+#imagePath{border-radius:8px}
 input[type=number]{width:76px;min-height:36px;text-align:center;font:12px var(--font-mono)}
 .segment{display:grid;grid-template-columns:repeat(var(--count),1fr);gap:5px}.segment input{position:absolute;opacity:0}
 .segment label,.btn{display:grid;place-items:center;min-height:36px;padding:7px;border:1px solid rgba(157,129,243,.28);border-radius:4px;background:rgba(31,24,45,.9);color:var(--text-muted);font-size:11px;font-weight:750}
@@ -98,7 +98,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00060</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00066</span></header>
 <form id="form" class="stack">
 
 <section class="card config"><div class="head"><h2 class="title">Preset</h2><span class="note">Predefined library from presets.txt</span></div><div class="body grid">
@@ -144,8 +144,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </div></div>
 </div></section>
 
-<section class="card"><div class="head"><h2 class="title">Execution</h2><span class="note">Local run preferences</span></div><div class="body grid">
-<div class="field"><div class="row"><label>Output directory</label><span class="help">Optional</span></div><input id="outputDir" type="text" value="" placeholder="Leave blank for default location" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+<section class="card"><div class="head"><h2 class="title">Execution</h2><span class="note">Local run preferences</span></div><div class="body switches">
 <div class="switchrow"><div><strong>Play result when finished</strong><small>--sound · plays the completed video</small></div><label class="switch"><input id="playOnFinish" type="checkbox"><span class="track"></span></label></div>
 </div></section>
 
@@ -157,7 +156,6 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 (()=>{"use strict";
 const SHORTCUT="Run Img2Video in a-Shell";
 const SCRIPT="~File Provider Storage/img2video_iphone.py";
-const OUTPUT_FILENAME="img2video_output.mp4";
 const WORK_KEY="img2videoSafariV4";
 const LEGACY_WORK_KEY="img2videoSafariV3";
 const LEGACY_PRESETS_KEY="img2videoPresetsV1";
@@ -171,7 +169,7 @@ const DEFAULTS={
   model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,
   optimizations:false,interpolation:false,interpolationFps:24,
   generationMode:"chain",combineVideos:true,maxParallelTasks:6,
-  outputDir:"",playOnFinish:false
+  playOnFinish:false
 };
 const KNOWN_MODELS=["ltx-2.3","wan-2.2"];
 const KNOWN_RES=["480p","720p","1080p"];
@@ -240,7 +238,6 @@ function state(){
     generationMode:selectedValue("generationMode")||DEFAULTS.generationMode,
     combineVideos:$("combineVideos").checked,
     maxParallelTasks:Number($("maxParallel").value)||DEFAULTS.maxParallelTasks,
-    outputDir:readablePath($("outputDir").value),
     playOnFinish:$("playOnFinish").checked
   };
 }
@@ -253,10 +250,6 @@ function generationState(source=state()){
 
 function workJson(source=state()){return JSON.stringify(source)}
 function generationsEqual(a,b){return GENERATION_KEYS.every(key=>a[key]===b[key])}
-
-function joinOutputPath(dir){
-  return dir.replace(/\/+$/,"")+"/"+OUTPUT_FILENAME;
-}
 
 function argGroups(current){
   const groups=[];
@@ -275,7 +268,6 @@ function argGroups(current){
     groups.push(current.combineVideos?"--combine-videos":"--no-combine-videos");
     if(current.generationMode==="parallel")groups.push("--max-parallel-tasks "+current.maxParallelTasks);
   }
-  if(current.outputDir)groups.push("--output "+shellPath(joinOutputPath(current.outputDir)));
   if(current.playOnFinish)groups.push("--sound");
   return groups;
 }
@@ -431,7 +423,6 @@ function restore(saved,{persist=false}={}){
   selectRadio("generationMode",KNOWN_MODES.includes(merged.generationMode)?merged.generationMode:DEFAULTS.generationMode);
   $("combineVideos").checked=merged.combineVideos!==undefined?Boolean(merged.combineVideos):DEFAULTS.combineVideos;
   syncPair("maxParallelRange","maxParallel",merged.maxParallelTasks,1,6,DEFAULTS.maxParallelTasks);
-  $("outputDir").value=readablePath(merged.outputDir||"");
   $("playOnFinish").checked=Boolean(merged.playOnFinish);
   renderPromptList();
   applyModelLimits();

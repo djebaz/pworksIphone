@@ -1,4 +1,4 @@
-<!-- VERSION$00063$ | Edited: 07/08 | TIME: 10:27 -->
+<!-- VERSION$00068$ | Edited: 07/08 | TIME: 10:43 -->
 # Img2Video Execution Model — UI State → CLI
 
 This document explains how the Safari UI's live form state becomes the exact command line handed to `app/img2video_iphone.py`, and from there to the Shortcut.
@@ -11,7 +11,7 @@ The UI keeps one in-memory state object (`state()` in `index.html`), rebuilt fro
 imagePath, prompts[], model, resolution, performance, fps, frames, priority,
 optimizations, interpolation, interpolationFps,
 generationMode, combineVideos, maxParallelTasks,
-outputDir, playOnFinish
+playOnFinish
 ```
 
 `prompts` is an ordered array of strings — the ordered prompt list from the Motion section, sanitized (newlines collapsed to spaces, trimmed) at read time. Everything else is a single scalar sourced from the matching form control.
@@ -26,8 +26,7 @@ outputDir, playOnFinish
 4. `--optimizations`/`--no-optimizations`, `--interpolation`/`--no-interpolation`
 5. `--interpolate <target>` — only when `interpolation` is true
 6. `--mode`, `--combine-videos`/`--no-combine-videos`, `--max-parallel-tasks` — only when `prompts.length > 1` (and `--max-parallel-tasks` only when `generationMode === "parallel"`)
-7. `--output <dir>/img2video_output.mp4` — only when `outputDir` is non-empty
-8. `--sound` — only when `playOnFinish` is true
+7. `--sound` — only when `playOnFinish` is true
 
 The **Command Preview** panel renders the same argument groups one per line for readability, but that formatting is display-only. The value actually copied by "Copy command" and actually sent to the Shortcut (as the `cmd` field of the launch payload) is always the single space-joined line — no literal newlines are ever placed inside the executed command, so what a-Shell runs is identical either way.
 
@@ -55,12 +54,13 @@ Each prompt becomes its own `--prompt` argument, shell-quoted with the existing 
 
 ## Execution-only settings
 
-Two fields never influence the generation request payload sent to ArtWorks.ai — they only affect how the local run behaves:
+One field never influences the generation request payload sent to ArtWorks.ai — it only affects how the local run behaves:
 
-- **Output directory** → `--output <dir>/img2video_output.mp4`, omitted when blank. When omitted, `img2video_iphone.py` falls back to its own default of `<photo-name>_video.mp4` saved beside the source image. When set, the UI joins the given directory with the fixed filename `img2video_output.mp4` (matching the previous Safari UI's hardcoded output convention) rather than requiring the user to type a full file path.
 - **Play result when finished** → `--sound` (the client's actual flag, also spelled `-s`; there is no `--open-video` flag). Plays the completed video locally after a successful generation run.
 
-Both are excluded from `presets.txt` and from "Import settings.txt" — see `img2video-presets-settings-contract.md` for why.
+It is excluded from `presets.txt` and from "Import settings.txt" — see `img2video-presets-settings-contract.md` for why.
+
+There is intentionally no output-directory control. `--output` is always omitted, so `img2video_iphone.py` falls back to its own default of `<photo-name>_video.mp4` saved beside the source image. An earlier draft of this UI added an output-directory text field, but iOS Safari has no API that can turn a folder picker into a real filesystem path (no File System Access API, no working `webkitdirectory`), so a manually-typed path would have looked like a picker without behaving like one — see the ux-spec doc's Execution controls section.
 
 ## Shortcut hand-off
 

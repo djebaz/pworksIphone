@@ -1,4 +1,4 @@
-<!-- VERSION$00062$ | Edited: 07/08 | TIME: 10:26 -->
+<!-- VERSION$00069$ | Edited: 07/08 | TIME: 10:44 -->
 # Img2Video Presets / Settings / Local-State Contract
 
 This document explains the three configuration layers behind `shortcuts/img2video/index.html` and where each one's authority stops. It exists so the boundary between "preset library," "one-off settings import," and "current working UI state" stays intentional as the UI grows, instead of drifting field by field.
@@ -32,7 +32,7 @@ name|model|resolution|performance|fps|numFrames|priority|applyOptimizations|appl
 
 Any line that fails these checks is skipped and counted; the UI reports how many valid presets loaded and how many lines were skipped, but never fails silently.
 
-`presets.txt` intentionally cannot express a prompt, image, generation mode, combine-videos preference, max-parallel-tasks value, output directory, or play-on-finish preference — none of those are preset-scoped. See "What remains outside presets" below.
+`presets.txt` intentionally cannot express a prompt, image, generation mode, combine-videos preference, max-parallel-tasks value, or play-on-finish preference — none of those are preset-scoped. See "What remains outside presets" below.
 
 ## `settings.txt` format
 
@@ -61,7 +61,7 @@ applyOptimizations, applyInterpolation, interpolationFps
 Everything else in the current UI state is either a *motion* concern or an *execution* concern, and both are explicitly excluded from presets and from settings.txt import:
 
 - **Motion** (per-run creative input, order-sensitive): the prompt list, generation mode (chain/parallel), combine-videos, max-parallel-tasks. See `img2video-execution-model.md` for how these become CLI flags.
-- **Execution** (local device/run preferences, not part of the creative or generation request): output directory, play-result-when-finished.
+- **Execution** (local device/run preferences, not part of the creative or generation request): play-result-when-finished.
 - **Source**: the selected filename/image is never preset- or settings-derived.
 
 ## Reset and recovery
