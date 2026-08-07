@@ -1,4 +1,4 @@
-<!-- VERSION$00066$ | Edited: 07/08 | TIME: 10:41 -->
+<!-- VERSION$00072$ | Edited: 07/08 | TIME: 13:26 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -81,6 +81,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px}
 .placeholder{position:absolute;inset:0;display:grid;place-items:center;padding:8px;text-align:center;background:linear-gradient(125deg,#463054,#21162f 48%,#110c1d);color:rgba(255,255,255,.4);font-size:9.5px;font-weight:700;text-transform:uppercase;line-height:1.3}.preview.has .placeholder{display:none}
 .shade{position:absolute;inset:auto 0 0;padding:18px 6px 5px;background:linear-gradient(transparent,rgba(7,5,18,.9));font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file{position:absolute;opacity:0;width:1px;height:1px}
 .switches{display:grid}.switchrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}.switchrow:last-of-type{border:0}.switchrow small{display:block;margin-top:3px;color:var(--text-muted)}
+.switchrow.disabled{opacity:.45}.switchrow.disabled .switch{pointer-events:none}
 .switch{width:48px;height:28px;position:relative}.switch input{opacity:0}.track{position:absolute;inset:0;border:1px solid rgba(157,129,243,.3);border-radius:999px;background:rgba(255,255,255,.08)}.track:after{content:"";position:absolute;width:22px;height:22px;left:2px;top:2px;border-radius:50%;background:#d9d2e7;transition:.16s}.switch input:checked+.track{background:var(--accent-1)}.switch input:checked+.track:after{transform:translateX(20px);background:#fff8df}
 .subfield{padding:10px 0 2px}.subfield.disabled{opacity:.4}.subfield.disabled .segment{pointer-events:none}
 #promptList{display:grid}
@@ -88,6 +89,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px}
 .promptitem:last-of-type{border:0}
 .promptactions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .promptactions .btn{min-height:32px;font-size:10.5px}
+.seedrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.seedrow .btn{min-width:96px}
+.commandtoggle{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.commandtoggle .note{display:flex;align-items:center;gap:7px}.commandchev{display:inline-block;min-width:10px;color:var(--accent-1);font-size:12px}
 pre{margin:0;padding:11px 12px;border:1px solid rgba(157,129,243,.18);border-radius:8px;background:rgba(7,5,18,.44);font:11px/1.45 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
 .toast{display:none;margin-top:10px;padding:10px;border:1px solid rgba(74,222,128,.4);border-radius:8px;background:rgba(20,60,40,.2);color:#bbf7d0;font-size:11px}.toast.show{display:block}.toast.error{border-color:rgba(255,71,87,.45);background:rgba(127,29,29,.16);color:#fecaca}
@@ -98,7 +101,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00066</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00072</span></header>
 <form id="form" class="stack">
 
 <section class="card config"><div class="head"><h2 class="title">Preset</h2><span class="note">Predefined library from presets.txt</span></div><div class="body grid">
@@ -129,6 +132,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <div class="field"><label>Performance</label><div class="segment" style="--count:3"><input id="speed" type="radio" name="performance" value="speed" checked><label for="speed">Speed</label><input id="quality" type="radio" name="performance" value="quality"><label for="quality">Quality</label><input id="express" type="radio" name="performance" value="express"><label for="express">Express</label></div></div>
 <div class="field"><div class="row"><label>Request FPS</label><span class="help">Model-specific range</span></div><div class="range"><input id="fpsRange" type="range"><input id="fps" type="number"></div><div class="bounds"><span id="fpsMin"></span><span id="fpsMax"></span></div></div>
 <div class="field"><div class="row"><label>Requested frames</label><span class="help">Output may normalize</span></div><div class="range"><input id="framesRange" type="range"><input id="frames" type="number"></div><div class="bounds"><span id="framesMin"></span><span id="framesMax"></span></div></div>
+<div class="field"><div class="row"><label for="seed">Seed</label><span id="seedHelp" class="help">Optional signed 64-bit integer</span></div><div class="seedrow"><input id="seed" type="text" value="" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Random"><button id="randomizeSeed" class="btn" type="button">Randomize</button></div></div>
 <div class="field"><div class="row"><label>Queue priority</label><span class="help">1 highest · 5 normal</span></div><div class="range"><input id="priorityRange" type="range" min="1" max="5"><input id="priority" type="number" min="1" max="5"></div></div>
 </div></section>
 
@@ -145,10 +149,10 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </div></section>
 
 <section class="card"><div class="head"><h2 class="title">Execution</h2><span class="note">Local run preferences</span></div><div class="body switches">
-<div class="switchrow"><div><strong>Play result when finished</strong><small>--sound · plays the completed video</small></div><label class="switch"><input id="playOnFinish" type="checkbox"><span class="track"></span></label></div>
+<div id="playOnFinishRow" class="switchrow"><div><strong>Play result when finished</strong><small id="playOnFinishHelp">--sound · plays the completed video</small></div><label class="switch"><input id="playOnFinish" type="checkbox"><span class="track"></span></label></div>
 </div></section>
 
-<section class="card"><div class="head"><h2 class="title">Command Preview</h2><span class="note">filename + cmd sent as JSON</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
+<section class="card"><button id="commandToggle" class="head commandtoggle" type="button" aria-expanded="false" aria-controls="commandBody"><h2 class="title">Command Preview</h2><span class="note"><span id="commandChevron" class="commandchev">▸</span> filename + cmd sent as JSON</span></button><div id="commandBody" class="body" hidden><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
 </form>
 </main>
 <footer><div class="footerin"><button class="launch" type="submit" form="form">Launch Shortcut</button><span id="runStatus" class="pill ready">READY</span></div></footer>
@@ -166,7 +170,7 @@ const GENERATION_KEYS=["model","resolution","performance","fps","frames","priori
 const DEFAULTS={
   imagePath:"",
   prompts:["Static camera, subtle natural movement."],
-  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,
+  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,seed:"",priority:1,
   optimizations:false,interpolation:false,interpolationFps:24,
   generationMode:"chain",combineVideos:true,maxParallelTasks:6,
   playOnFinish:false
@@ -175,6 +179,7 @@ const KNOWN_MODELS=["ltx-2.3","wan-2.2"];
 const KNOWN_RES=["480p","720p","1080p"];
 const KNOWN_PERF=["speed","quality","express"];
 const KNOWN_MODES=["chain","parallel"];
+const SEED_MIN=-(1n<<63n),SEED_MAX=(1n<<63n)-1n;
 const $=id=>document.getElementById(id);
 const selectedValue=name=>document.querySelector(`input[name="${name}"]:checked`)?.value||"";
 const selectRadio=(name,value)=>{const item=document.querySelector(`input[name="${name}"][value="${CSS.escape(String(value))}"]`);if(item)item.checked=true};
@@ -218,8 +223,17 @@ function clamp(value,min,max,fallback){
   return Math.min(max,Math.max(min,Math.round(number)));
 }
 
-function sanitizePrompt(value){
-  return String(value??"").replace(/[\r\n]+/g," ").trim();
+function sanitizePrompt(value){return String(value??"").replace(/[\r\n]+/g," ").trim()}
+
+function seedValue(value){
+  const text=String(value??"").trim();
+  if(!text)return{valid:true,text:""};
+  if(!/^[+-]?\d+$/.test(text))return{valid:false,text};
+  try{
+    const number=BigInt(text);
+    if(number<SEED_MIN||number>SEED_MAX)return{valid:false,text};
+    return{valid:true,text:number.toString()};
+  }catch{return{valid:false,text}}
 }
 
 function state(){
@@ -231,6 +245,7 @@ function state(){
     performance:selectedValue("performance"),
     fps:Number($("fps").value),
     frames:Number($("frames").value),
+    seed:$("seed").value.trim(),
     priority:Number($("priority").value),
     optimizations:$("optimizations").checked,
     interpolation:$("interpolation").checked,
@@ -250,6 +265,7 @@ function generationState(source=state()){
 
 function workJson(source=state()){return JSON.stringify(source)}
 function generationsEqual(a,b){return GENERATION_KEYS.every(key=>a[key]===b[key])}
+function canPlayResult(current){return !(current.prompts.length>1&&current.generationMode==="parallel"&&!current.combineVideos)}
 
 function argGroups(current){
   const groups=[];
@@ -259,6 +275,8 @@ function argGroups(current){
   groups.push("--performance "+current.performance);
   groups.push("--fps "+current.fps);
   groups.push("--frames "+current.frames);
+  const seed=seedValue(current.seed);
+  if(seed.text)groups.push("--seed "+seed.text);
   groups.push("--priority "+current.priority);
   groups.push(current.optimizations?"--optimizations":"--no-optimizations");
   groups.push(current.interpolation?"--interpolation":"--no-interpolation");
@@ -268,18 +286,12 @@ function argGroups(current){
     groups.push(current.combineVideos?"--combine-videos":"--no-combine-videos");
     if(current.generationMode==="parallel")groups.push("--max-parallel-tasks "+current.maxParallelTasks);
   }
-  if(current.playOnFinish)groups.push("--sound");
+  if(current.playOnFinish&&canPlayResult(current))groups.push("--sound");
   return groups;
 }
 
-function command(current){
-  return["python",shellPath(SCRIPT),...argGroups(current)].join(" ");
-}
-
-function commandPreview(current){
-  return["python "+shellPath(SCRIPT),...argGroups(current)].join("\n");
-}
-
+function command(current){return["python",shellPath(SCRIPT),...argGroups(current)].join(" ")}
+function commandPreview(current){return["python "+shellPath(SCRIPT),...argGroups(current)].join(" \u005c\n")}
 function shortcutPayload(current){return JSON.stringify({version:1,filename:basename(current.imagePath),cmd:command(current)})}
 
 function syncPair(rangeId,numberId,value,min,max,fallback){
@@ -311,6 +323,19 @@ function updateMotionVisibility(){
   $("motionModeField").hidden=!multi;
   $("combineField").hidden=!multi;
   $("maxParallelField").hidden=!(multi&&selectedValue("generationMode")==="parallel");
+}
+
+function updateExecutionState(current){
+  const available=canPlayResult(current);
+  $("playOnFinish").disabled=!available;
+  $("playOnFinishRow").classList.toggle("disabled",!available);
+  $("playOnFinishHelp").textContent=available?"--sound · plays the completed video":"Unavailable for uncombined parallel outputs";
+}
+
+function setCommandExpanded(expanded){
+  $("commandToggle").setAttribute("aria-expanded",expanded?"true":"false");
+  $("commandBody").hidden=!expanded;
+  $("commandChevron").textContent=expanded?"▾":"▸";
 }
 
 function makePromptButton(text,cls,index,disabled){
@@ -391,6 +416,11 @@ function refresh({persist=true}={}){
   applyInterpolationState();
   updateMotionVisibility();
   const current=state();
+  updateExecutionState(current);
+  const seed=seedValue(current.seed);
+  $("seed").setAttribute("aria-invalid",seed.valid?"false":"true");
+  $("seedHelp").textContent=seed.valid?"Optional signed 64-bit integer":"Invalid signed 64-bit integer";
+  $("seedHelp").style.color=seed.valid?"":"var(--danger-3)";
   $("imagePath").value=current.imagePath;
   $("promptCount").textContent=current.prompts.length+(current.prompts.length===1?" prompt":" prompts");
   lastCommand=command(current);
@@ -416,6 +446,7 @@ function restore(saved,{persist=false}={}){
   selectRadio("performance",KNOWN_PERF.includes(merged.performance)?merged.performance:DEFAULTS.performance);
   $("fps").value=merged.fps;
   $("frames").value=merged.frames;
+  $("seed").value=String(merged.seed??"");
   syncPair("priorityRange","priority",merged.priority,1,5,DEFAULTS.priority);
   $("optimizations").checked=Boolean(merged.optimizations);
   $("interpolation").checked=Boolean(merged.interpolation);
@@ -503,6 +534,7 @@ function applyGenerationFields(fields){
   if(fields.performance!==undefined)selectRadio("performance",fields.performance);
   $("fps").value=clamp(fields.fps??$("fps").value,limits.fps[0],limits.fps[1],Number($("fps").value));
   $("frames").value=clamp(fields.frames??$("frames").value,limits.frames[0],limits.frames[1],Number($("frames").value));
+  if(fields.seed!==undefined&&seedValue(fields.seed).valid)$("seed").value=seedValue(fields.seed).text;
   if(fields.priority!==undefined)syncPair("priorityRange","priority",fields.priority,1,5,Number($("priority").value));
   if(fields.optimizations!==undefined)$("optimizations").checked=Boolean(fields.optimizations);
   if(fields.interpolation!==undefined)$("interpolation").checked=Boolean(fields.interpolation);
@@ -527,6 +559,7 @@ function parseSettingsLines(lines){
       case "performance":KNOWN_PERF.includes(value)?(fields.performance=value,appliedCount++):skippedCount++;break;
       case "fps":{const n=Number(value);Number.isFinite(n)?(fields.fps=Math.round(n),appliedCount++):skippedCount++;break}
       case "numFrames":{const n=Number(value);Number.isFinite(n)?(fields.frames=Math.round(n),appliedCount++):skippedCount++;break}
+      case "seed":{const parsed=seedValue(value);parsed.valid?(fields.seed=parsed.text,appliedCount++):skippedCount++;break}
       case "priority":{const n=Number(value);Number.isFinite(n)?(fields.priority=Math.min(5,Math.max(1,Math.round(n))),appliedCount++):skippedCount++;break}
       case "applyOptimizations":fields.optimizations=/^true$/i.test(value);appliedCount++;break;
       case "applyInterpolation":fields.interpolation=/^true$/i.test(value);appliedCount++;break;
@@ -538,6 +571,7 @@ function parseSettingsLines(lines){
 }
 
 function showError(message){
+  setCommandExpanded(true);
   $("toast").textContent=message;
   $("toast").className="toast show error";
   $("runStatus").textContent="ERROR";
@@ -627,6 +661,22 @@ $("addPrompt").addEventListener("click",()=>{
   refresh();
 });
 
+$("randomizeSeed").addEventListener("click",()=>{
+  let value;
+  try{
+    const words=new Uint32Array(2);
+    crypto.getRandomValues(words);
+    const unsigned=(BigInt(words[0])<<32n)|BigInt(words[1]);
+    value=unsigned>SEED_MAX?unsigned-(1n<<64n):unsigned;
+  }catch{
+    value=BigInt(Math.floor(Math.random()*0x7fffffff));
+  }
+  $("seed").value=value.toString();
+  refresh();
+});
+
+$("commandToggle").addEventListener("click",()=>setCommandExpanded($("commandToggle").getAttribute("aria-expanded")!=="true"));
+
 $("form").addEventListener("input",event=>{
   const target=event.target;
   if(target.id==="fileInput"||target.id==="settingsInput")return;
@@ -653,8 +703,10 @@ $("form").addEventListener("change",event=>{
 
 $("copy").addEventListener("click",async()=>{
   clearStatus();
+  const current=state();
+  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
   try{await navigator.clipboard.writeText(lastCommand);$("runStatus").textContent="COPIED"}
-  catch{showError("Press and hold the command to copy it.")}
+  catch{showError("Clipboard unavailable — press and hold the command; its line breaks are shell-safe continuations.")}
 });
 
 $("reset").addEventListener("click",()=>{
@@ -674,6 +726,7 @@ $("form").addEventListener("submit",event=>{
   const current=state();
   if(!basename(current.imagePath))return showError("Choose an image or enter its filename.");
   if(!current.prompts.length||current.prompts.some(prompt=>!prompt))return showError("Enter a motion prompt for every prompt block.");
+  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
   location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(shortcutPayload(current));
 });
 
@@ -684,6 +737,7 @@ let saved={};
 try{saved=JSON.parse(localStorage.getItem(WORK_KEY)||"{}")}catch{}
 restore({...DEFAULTS,...saved},{persist:false});
 lastWorkJson=workJson(state());
+setCommandExpanded(false);
 loadPresetLibrary();
 })();
 </script>
