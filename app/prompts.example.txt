@@ -1,0 +1,7 @@
+# VERSION$00035$ | Edited: 07/08 | TIME: 05:47
+# One prompt per non-empty, non-comment line.
+# In parallel mode, you may bind a source image with: photo.jpg::prompt text
+
+Static camera, subtle natural movement.
+Slow head turn with natural blinking and breathing.
+Gentle body movement while keeping the camera locked.
