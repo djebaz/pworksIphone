@@ -1,17 +1,30 @@
-<!-- VERSION$00001$ | Edited: 07/08 | TIME: 18:20 -->
+<!-- VERSION$00002$ | Edited: 07/08 | TIME: 18:53 -->
 # PWA Security and API Architecture
 
 ## Purpose
 
 Define the security boundary for moving ArtWorks task handling from the current iPhone Python client into a GitHub Pages-hosted PWA.
 
-This document is exploratory. No credential architecture has been selected yet.
+## Selected direction
+
+**Decision:** use user-supplied ArtWorks credentials and keep those reusable credentials on the user's device.
+
+The PWA should call ArtWorks directly from the browser if the provider's CORS policy permits the required authenticated requests.
+
+A shared application credential, GitHub Actions secret, or credential injected into the public Pages build is explicitly rejected.
+
+This selected direction still requires two implementation decisions:
+
+1. the exact protected device-local persistence/unlock UX for the user's credential;
+2. verified ArtWorks browser CORS/preflight behavior.
 
 ## Current authentication behavior
 
-The current Python client constructs an HTTP Basic Authorization header from the locally stored ArtWorks username and password and sends requests directly to `https://api.artworks.ai`.
+The current Python client constructs an HTTP Basic `Authorization` header from the locally stored ArtWorks username and password and sends requests directly to `https://api.artworks.ai`.
 
 That is viable in the current architecture because the credentials live in a local file next to the Python runtime on the user's device and are not published with the repository or static site.
+
+The browser implementation should preserve the ownership property — the user owns the credential — without pretending browser storage is equivalent to a native secret vault.
 
 ## Fundamental GitHub Pages constraint
 
@@ -23,169 +36,253 @@ Therefore:
 - GitHub Actions secrets are secret while a workflow runs, but a value injected into a deployed browser asset becomes public to anyone who can fetch that asset;
 - JavaScript environment variables produced at build time are not secret once bundled or emitted into the site;
 - a Service Worker is client-side code and is not a secret store;
+- Cache Storage, IndexedDB, and `localStorage` are client-side storage, not server-side environment variables;
 - obfuscation, Base64, minification, or splitting a credential across files does not make it secret.
 
-A static PWA cannot contain a reusable private ArtWorks password and keep that password hidden from the browser/user.
+A static PWA cannot contain a reusable private ArtWorks password and keep that password hidden from its own browser runtime.
 
-## Architecture A — user-supplied credentials, direct browser-to-ArtWorks
+## Selected architecture — user-supplied credentials, direct browser-to-ArtWorks
 
 ### Model
 
-The PWA asks the user for ArtWorks credentials locally and calls ArtWorks directly with `fetch()`.
+The PWA asks the user for their ArtWorks username/password locally and calls ArtWorks directly with `fetch()`.
 
 ### Advantages
 
-- GitHub Pages can remain the only hosting platform for the application itself.
-- No separate backend needs to be operated.
+- GitHub Pages remains sufficient for application hosting.
+- No general ArtWorks proxy needs to be operated.
 - Credentials are not committed to the repository or embedded in public deployment artifacts.
-- The API request path is simple if ArtWorks CORS permits it.
+- Each user consumes their own ArtWorks account rather than a shared project credential.
+- The API request path remains simple if ArtWorks CORS permits it.
 
-### Security properties
+### Critical prerequisite: CORS
 
-The credentials are necessarily available to JavaScript while requests are being made.
+ArtWorks must allow the deployed PWA origin to make authenticated cross-origin requests, including the `Authorization` header and required methods/endpoints.
 
-Storage choices have different tradeoffs:
+The fact that the Python client works is not evidence of browser CORS support.
 
-- **memory only**: safest simple option against persistence, but credentials must be entered again after application restart;
-- **sessionStorage**: persists for the browser session but is still readable by same-origin JavaScript;
-- **localStorage**: convenient but persistent and readable by any JavaScript executing on the origin; not appropriate to describe as secure secret storage;
-- **IndexedDB**: better structured storage but not intrinsically a secure credential vault;
-- **password-manager/autofill flow**: potentially useful for UX, but browser/platform support must be studied and it does not change the fact that credentials enter page JavaScript when used.
+Current status: **Unverified.**
 
-A strong Content Security Policy, no untrusted scripts, no HTML injection, careful dependency control, and avoiding unnecessary third-party JavaScript become especially important if credentials ever enter the PWA.
+A non-billable browser/preflight probe should be performed before generation implementation. Do not create a live generation merely to discover a CORS header.
 
-### Critical prerequisite
+## Credential persistence threat model
 
-ArtWorks must support cross-origin browser requests from the PWA origin, including preflight for the `Authorization` header and the required HTTP methods.
+The user wants the credential retained on-device rather than re-entered on every launch.
 
-This is currently unverified.
+The primary browser threat is cross-site scripting: any malicious JavaScript executing with the PWA's origin privileges can potentially read application storage and can access a credential while the application has unlocked it for use.
 
-### Best fit
+This means persistence must be described accurately:
 
-Potentially attractive for a personal/single-user application if direct browser CORS works and the user accepts entering credentials on the device.
+- no web storage mechanism makes a reusable browser credential immune to same-origin script compromise;
+- encryption at rest can reduce exposure from raw storage inspection, backups, or accidental leakage;
+- encryption does **not** defeat XSS after the PWA has unlocked the credential, because authorized application JavaScript must eventually obtain usable secret material to build the request;
+- storing an encryption key beside the ciphertext in the same origin only disguises the value and does not create a meaningful security boundary.
 
-## Architecture B — thin authenticated API proxy
+## Storage options
 
-### Model
+### Memory only
 
-The GitHub Pages PWA calls a small server-side endpoint. That backend stores the ArtWorks credential in its own secret manager/environment and makes authenticated ArtWorks requests on behalf of the PWA.
+Strongest simple browser option because no reusable credential is persisted by the application.
 
-Possible hosting categories include edge/serverless functions or a small conventional backend. The provider should be selected later based on operational simplicity, cost, authentication options, request/body limits, and timeout behavior.
+Disadvantage: the user must supply/unlock it again after restart.
 
-### Advantages
+Retain as a fallback/private-session mode, but it does not satisfy the selected convenience goal by itself.
 
-- ArtWorks credentials never need to be shipped to browser JavaScript.
-- CORS toward ArtWorks becomes a server-to-server concern rather than a browser restriction.
-- The proxy can validate allowed operations and payload sizes.
-- Rate limiting and abuse controls can be added.
-- Credentials can be rotated without redeploying the PWA.
+### `sessionStorage`
 
-### Risks and requirements
+Not selected for persistent credentials. It is still readable by same-origin JavaScript and disappears with the session.
 
-A public unauthenticated proxy would effectively publish access to the ArtWorks account and could create billable tasks for strangers. Therefore a proxy requires its own access-control strategy.
+### Raw `localStorage`
 
-Potential approaches include:
+**Rejected for ArtWorks credentials.**
 
-- user authentication in front of the proxy;
-- an access platform that authenticates the intended user;
-- short-lived signed session tokens issued after authentication;
-- another provider-supported identity mechanism.
+OWASP guidance specifically advises against storing sensitive authentication data in browser local storage because XSS can read it. Its synchronous, string-only API is also a poor fit for the PWA's structured recovery database.
 
-A static secret embedded in the PWA and used to authenticate to the proxy is not a solution; it would itself be public.
+`localStorage` may remain acceptable for low-risk UI preferences, but not for the username/password.
 
-### Best fit
+### Raw IndexedDB
 
-Strongest general architecture when the ArtWorks account credential must remain server-side and the PWA is reachable publicly.
+IndexedDB is the preferred structured storage mechanism for task/run/history state, but **raw IndexedDB is not a secret vault**. A credential stored there unencrypted is still available to same-origin JavaScript.
 
-## Architecture C — provider-issued browser-safe or short-lived credential
+### Encrypted credential record in IndexedDB
 
-### Model
+This is the preferred direction to study for persistent user credentials.
 
-Use an ArtWorks-supported token/API-key/session mechanism designed for browser or delegated use, ideally scoped and revocable and possibly short-lived.
+A defensible browser-only design is:
 
-### Status
+1. user enters ArtWorks credentials and an application unlock secret/passphrase;
+2. derive an encryption key with Web Crypto, for example PBKDF2 with a random salt and deliberately selected iteration count;
+3. encrypt the credential using authenticated encryption such as AES-GCM with a fresh IV;
+4. persist only ciphertext, salt, IV, version/KDF metadata, and non-secret UX metadata in IndexedDB;
+5. do not persist the derived encryption key;
+6. require the user to unlock the credential after a cold restart before authenticated ArtWorks calls can resume.
 
-Unknown. The current project evidence is based on username/password Basic authentication. Provider capabilities must be verified before relying on this option.
+This provides meaningful encryption at rest while keeping the reusable ArtWorks password off the repository and public build.
 
-### Best fit
+It does not make an unlocked page invulnerable to XSS, so frontend code security remains essential.
 
-Potentially the cleanest architecture if ArtWorks officially supports a browser-oriented, scoped credential flow.
+### Zero-friction auto-unlock
 
-## Architecture D — keep generation in the local Python client
+A design that stores both ciphertext and the decryption key under the same web origin should **not** be described as secure encrypted storage. It may deter casual inspection but provides little protection against origin compromise.
 
-### Model
+If a later platform-supported credential/password-manager mechanism can provide a stronger user-presence boundary, evaluate it separately rather than inventing a custom claim of native-keychain equivalence.
 
-The PWA remains a UI/orchestrator and hands work to the existing Shortcut/a-Shell/Python client.
+## Frontend security requirements
 
-### Advantages
+Because the future PWA will handle credentials directly, copying the legacy single-file HTML structure byte-for-byte is not the correct security goal. Preserve the UI and behavior, but the new `pwa/` may legitimately separate local CSS and JavaScript files to support a stricter policy.
 
-- Existing secret handling remains local.
-- Existing recovery, FFmpeg, download, chain, and assembly logic is preserved.
-- Lowest migration risk.
+### No third-party runtime JavaScript
 
-### Disadvantage
+Do not load analytics, tag managers, UI frameworks, CDN libraries, or other third-party runtime scripts without a concrete need and security review.
 
-This does not satisfy the desired end state in which the PWA itself handles ArtWorks calls.
+The dependency-free/plain-JavaScript project direction is an advantage here.
 
-### Use in planning
+### Fonts
 
-Retain as a fallback/reference architecture, not the target.
+The current launcher loads JetBrains Mono from Google Fonts. This is not JavaScript, but the new credential-bearing PWA should minimize third-party runtime dependencies generally.
 
-## Architectures that must be rejected
+Preferred options are:
 
-### GitHub Actions secret injected into the PWA
+- use the existing system/fallback monospace stack; or
+- self-host the required web-font assets if the typography is important.
 
-Rejected. Once rendered into browser-accessible code/configuration, the value is no longer secret.
-
-### Secret in `manifest.webmanifest`
-
-Rejected. The manifest is public.
-
-### Secret in Service Worker code or Cache Storage
-
-Rejected. Service Worker scripts and browser caches are client-side and inspectable.
-
-### Secret in a public repository with encoding/obfuscation
-
-Rejected. Encoding is not encryption and browser code must ultimately recover the value.
-
-### Public proxy with no caller authentication
-
-Rejected for production. It would expose billable ArtWorks capability to arbitrary callers.
-
-## Additional browser security considerations
-
-### Cross-site scripting
-
-If the page holds or uses credentials, XSS becomes credential compromise. Avoid unnecessary third-party JavaScript and unsafe DOM injection.
-
-The current UI already uses an external Google Fonts stylesheet but no external JavaScript library. Preserving a dependency-light runtime is beneficial.
+Do not make external font availability a functional dependency.
 
 ### Content Security Policy
 
-A future implementation should investigate a restrictive CSP compatible with the existing inline CSS/JavaScript architecture. A strong CSP may motivate moving inline JavaScript and CSS to local files or using hashes/nonces, but this should be a deliberate security change rather than an aesthetic refactor.
+Use a restrictive Content Security Policy as defense in depth.
 
-### Result URLs
+Because GitHub Pages is static, a CSP delivered through a `<meta http-equiv="Content-Security-Policy">` element is a practical baseline when response-header control is unavailable, while recognizing that some CSP directives are only effective as HTTP headers.
 
-The ArtWorks result-media origin and its CORS/content-disposition behavior must be checked. Browser display, direct download, canvas extraction, and media processing can have different cross-origin requirements.
+The initial policy should be allowlist-based and tightened around the actual PWA architecture. Likely needs include:
 
-### Local persistence
+- scripts from `'self'` only;
+- styles from `'self'` only if CSS is separated;
+- worker and manifest from `'self'`;
+- image support for local resources plus `blob:`/`data:` where genuinely required;
+- explicit `connect-src` for the ArtWorks API and any verified media origin;
+- explicit `media-src` for downloaded/previewed result media if needed;
+- no arbitrary framing, plugins, or remote script hosts.
 
-Task IDs and non-secret recovery state are good candidates for IndexedDB or localStorage. Secret credentials and non-secret task state should not be conflated merely because both require persistence.
+Do not finalize the exact `connect-src`/`media-src` list until real ArtWorks result origins and CORS behavior are known.
 
-## Recommended discovery order
+### Safe DOM construction
 
-1. Inspect the authenticated ArtWorks OpenAPI/auth documentation for alternative authentication mechanisms.
-2. Verify CORS/preflight behavior without creating a billable generation where possible.
-3. Decide whether direct user-supplied credentials are acceptable for this personal PWA.
-4. If credentials must remain server-side, select a backend/proxy hosting and user-auth model.
-5. Only after the security boundary is selected, implement browser task submission.
+Continue the current application's good pattern of assigning user/provider strings through `textContent` and DOM properties rather than constructing executable HTML.
+
+Avoid `innerHTML` for prompt text, task errors, provider messages, filenames, or imported settings.
+
+## Task/recovery data is not secret credential data
+
+Use IndexedDB for structured non-secret application state such as:
+
+- runs and prompt sets;
+- remote task IDs;
+- parameters and last known status;
+- phase timestamps and retry counters;
+- output/download state;
+- reusable history.
+
+Keep the encrypted credential record logically separate so task/history code does not accidentally serialize the user's secret into logs, exports, or debugging views.
+
+The application may request durable browser storage through `navigator.storage.persist()` after meaningful user state exists. Persistent storage improves eviction resistance; it does not make data cryptographically secret.
+
+## Service Worker security boundary
+
+A Service Worker does not change the selected credential model.
+
+Do not:
+
+- hard-code the ArtWorks credential into `service-worker.js`;
+- copy it into Cache Storage;
+- include it in push subscription metadata;
+- log the `Authorization` header;
+- persist a decrypted credential in Service Worker globals and assume those globals are durable/private.
+
+If a Service Worker eventually handles an authenticated operation, it must obtain only the minimum material required through the selected unlock/session design, and implementation must account for Service Worker termination.
+
+The current background-execution research recommends that normal ArtWorks task polling remain foreground/recovery driven rather than credential-bearing background polling.
+
+## Web Push and the credential boundary
+
+Web Push requires an external sender. Under the selected architecture, that sender must not be given the user's reusable ArtWorks username/password merely so it can poll tasks.
+
+The clean future notification path would use an ArtWorks webhook/callback or a scoped/delegated provider credential that lets a minimal relay learn task completion without taking possession of the reusable account password.
+
+Current status of ArtWorks webhook/callback support: **Unknown.** No authoritative mechanism was identified in current project sources or the web research performed for this discovery. This absence must not be promoted to a claim that the provider does not support one.
+
+See [`background-execution-and-notifications.md`](background-execution-and-notifications.md) for the platform analysis.
+
+## Alternative architectures retained as fallbacks
+
+### Authenticated server-side proxy
+
+A conventional proxy would avoid browser CORS and could protect the ArtWorks credential server-side, but it conflicts with the currently selected user-owned/device-local credential direction unless users explicitly delegate credentials to it.
+
+Retain this only as a fallback if direct browser calls are impossible and no provider-scoped credential exists.
+
+A public unauthenticated proxy remains unacceptable because strangers could create billable tasks.
+
+### Provider-issued browser-safe or short-lived credential
+
+If ArtWorks officially offers a scoped, revocable, browser/delegated token, prefer that over repeatedly exposing a reusable password to application JavaScript.
+
+Current project evidence is based on Basic authentication; this alternative remains **Unknown** until provider documentation establishes it.
+
+### Keep generation in local Python
+
+The existing Shortcut/a-Shell/Python path remains the working fallback/reference implementation. It is not the selected PWA end state.
+
+## Architectures rejected
+
+The following are not security solutions:
+
+- GitHub Actions secret injected into the PWA;
+- a secret in `manifest.webmanifest`;
+- a secret hard-coded in Service Worker code;
+- a credential hidden in Cache Storage;
+- a raw ArtWorks password stored in `localStorage`;
+- a secret committed to the public repository with Base64/minification/obfuscation;
+- ciphertext with its reusable decryption key stored alongside it under the same origin and described as secure;
+- a public proxy with no caller authentication.
+
+## Logging and diagnostics
+
+The project-wide API safety rules continue to apply in the browser:
+
+- never log username/password;
+- never log `Authorization` headers;
+- never log full Base64/data-URL image payloads;
+- do not include secrets in task-history exports;
+- sanitize provider/API error presentation so diagnostic data is useful without leaking credentials;
+- preserve task IDs because they are essential for recovery and duplicate-billing avoidance.
+
+## Recommended implementation order
+
+1. Build the PWA shell without credentials or live submission.
+2. Implement IndexedDB task/run/history schema separately from secret storage.
+3. Implement the encrypted credential/unlock proof of concept using Web Crypto.
+4. Add restrictive CSP and keep runtime assets local.
+5. Run a non-billable ArtWorks CORS/preflight check from the real GitHub Pages PWA origin.
+6. Only if CORS succeeds, implement authenticated read/validation behavior.
+7. Submit a real generation only with explicit awareness that acceptance may be billable.
+8. Re-evaluate provider token/webhook capabilities before adding push infrastructure.
 
 ## Current recommendation
 
-Do not attempt to create a fake "secure environment variable" inside GitHub Pages. The real decision is between:
+Proceed with user-owned, device-local credentials, but do **not** translate that decision into raw `localStorage`.
 
-- credentials supplied on the user's device and sent directly to ArtWorks, if CORS permits; or
-- credentials stored in a separate authenticated backend/edge function that proxies ArtWorks.
+Use IndexedDB for structured application state and study encrypted IndexedDB + Web Crypto with a user unlock step for persistent credentials. Pair that with a strict local-only frontend dependency model and restrictive CSP.
 
-Provider-supported short-lived/scoped credentials should be preferred over both if ArtWorks offers them, but that capability is not yet verified.
+Direct ArtWorks requests remain contingent on verified CORS support. If CORS fails, the architecture must be revisited rather than weakened by publishing credentials or creating an unauthenticated proxy.
+
+## Research references
+
+Primary security/platform references reviewed:
+
+- OWASP HTML5 Security Cheat Sheet — browser storage guidance for sensitive data.
+- OWASP Content Security Policy Cheat Sheet — strict CSP as XSS defense in depth.
+- MDN Web Crypto API — PBKDF2 key derivation and AES-GCM authenticated encryption.
+- MDN IndexedDB API — structured asynchronous browser storage.
+- MDN StorageManager `persist()` — durable-storage request semantics.
+- web.dev persistent storage guidance — request persistence when durable user state becomes meaningful.
