@@ -1,4 +1,4 @@
-<!-- VERSION$00075$ | Edited: 07/08 | TIME: 13:26 -->
+<!-- VERSION$00092$ | Edited: 07/08 | TIME: 14:24 -->
 # Img2Video Presets / Settings / Local-State Contract
 
 This document explains the three configuration layers behind `shortcuts/img2video/index.html` and where each one's authority stops. It exists so the boundary between "preset library," "one-off settings import," and "current working UI state" stays intentional as the UI grows, instead of drifting field by field.
@@ -32,7 +32,7 @@ name|model|resolution|performance|fps|numFrames|priority|applyOptimizations|appl
 
 Any line that fails these checks is skipped and counted; the UI reports how many valid presets loaded and how many lines were skipped, but never silently normalizes an invalid preset row.
 
-The compact preset format intentionally remains unchanged in this revision. It cannot express a prompt, image, Seed, generation mode, combine-videos preference, max-parallel-tasks value, or play-on-finish preference.
+The compact preset format intentionally remains unchanged in this revision. It cannot express a prompt, image, Seed, Seed enabled/disabled state, generation mode, combine-videos preference, max-parallel-tasks value, or play-on-finish preference.
 
 ## `settings.txt` import
 
@@ -51,15 +51,23 @@ applyInterpolation
 interpolationFps
 ```
 
-`seed` is validated as a signed 64-bit integer and is stored as text in the UI so its exact value is not rounded by JavaScript. Unrecognized or invalid entries are counted as skipped.
+`seed` is validated as a signed 64-bit integer and is stored as text in the UI so its exact value is not rounded by JavaScript.
+
+Seed import semantics are explicit:
+
+- a non-empty valid `seed=<value>` loads that value and enables explicit Seed (`seedDisabled=false`);
+- an empty `seed=` selects **No CLI seed** (`seedDisabled=true`) without making Seed part of the preset model;
+- invalid or out-of-range Seed values are counted as skipped.
 
 The real `artworks_settings.txt` consumed directly by `app/img2video_iphone.py` is richer — it also carries `photo`, `promptFile`/`prompt`, `output`, `generationMode`, `combineVideos`, `maxParallelTasks`, polling/recovery tuning, and more. The Safari importer remains deliberately narrower: it does not import prompts, source selection, multi-prompt execution state, playback preference, output path, or recovery/network settings.
 
 ## Preset matching
 
-"Active preset" is derived, never stored. On every state change the UI compares the current values of the nine compact preset fields against every loaded preset (`generationsEqual`); if one matches exactly, its name is shown, otherwise the dropdown shows "Custom".
+"Active preset" is derived, never stored. On every state change the UI compares the current values of the nine compact preset fields against every loaded preset (`generationsEqual`); if one matches exactly, its name is shown, otherwise the preset button displays `Custom`.
 
-Seed is deliberately **not** part of preset matching. A user may select a preset, then set or randomize Seed while retaining that preset's generation/processing profile. This preserves the existing 10-column preset contract instead of turning a per-run reproducibility value into a preset-library migration.
+`Custom` is a derived display state only. It does **not** appear as a selectable preset-menu entry.
+
+Seed is deliberately **not** part of preset matching. The Seed value and `seedDisabled` flag may change while the same generation/processing preset remains active. This preserves the existing 10-column preset contract instead of turning a per-run reproducibility value into a preset-library migration.
 
 ## What a preset may change
 
@@ -70,9 +78,11 @@ model, resolution, performance, fps, numFrames, priority,
 applyOptimizations, applyInterpolation, interpolationFps
 ```
 
+A preset never changes the stored Seed value and never changes whether explicit Seed is enabled or `No CLI seed` is active.
+
 ## What remains outside presets
 
-- **Seed**: optional per-run generation value, persisted locally and importable from settings, but not preset-scoped.
+- **Seed**: per-run generation value plus `seedDisabled` working-state flag, persisted locally and importable from settings, but never preset-scoped.
 - **Motion**: prompt list, generation mode (chain/parallel), combine-videos, max-parallel-tasks.
 - **Execution**: play-result-when-finished.
 - **Source**: selected filename/image.
@@ -83,7 +93,7 @@ applyOptimizations, applyInterpolation, interpolationFps
 
 1. Clears the working-state key (`img2videoSafariV4`).
 2. Clears known legacy keys (`img2videoSafariV3`, `img2videoPresetsV1`).
-3. Restores every field, including Seed, the prompt list, and Execution, to `DEFAULTS`.
+3. Restores every field, including `seed=42` with explicit Seed enabled (`seedDisabled=false`), the prompt list, and Execution, to `DEFAULTS`.
 4. Re-fetches `presets.txt` from scratch with the existing no-cache behavior.
 
 The Command Preview expanded/collapsed state is not persisted; a fresh page load starts with it collapsed.
