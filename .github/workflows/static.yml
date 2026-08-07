@@ -5,7 +5,7 @@ name: Deploy Img2Video to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["claude/img2video-safari-multiprompt-7imqv7"]
     paths:
       - "shortcuts/img2video/**"
       - ".github/workflows/static.yml"
