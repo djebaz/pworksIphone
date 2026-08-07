@@ -1,4 +1,4 @@
-<!-- VERSION$00059$ | Edited: 07/08 | TIME: 11:15 -->
+<!-- VERSION$00066$ | Edited: 07/08 | TIME: 10:41 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -63,6 +63,7 @@ input[type=number]{width:76px;min-height:36px;text-align:center;font:12px var(--
 .segment{display:grid;grid-template-columns:repeat(var(--count),1fr);gap:5px}.segment input{position:absolute;opacity:0}
 .segment label,.btn{display:grid;place-items:center;min-height:36px;padding:7px;border:1px solid rgba(157,129,243,.28);border-radius:4px;background:rgba(31,24,45,.9);color:var(--text-muted);font-size:11px;font-weight:750}
 .segment input:checked+label{color:var(--accent-1);border-color:rgba(251,191,36,.58);background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(236,72,153,.09),rgba(139,92,246,.15))}
+.btn:disabled{opacity:.4;pointer-events:none}
 .range{display:grid;grid-template-columns:1fr 76px;gap:10px;align-items:center}
 input[type=range]{width:100%;height:38px;padding:15px 0;box-sizing:border-box;accent-color:var(--accent-1)}
 input[type=range]::-webkit-slider-thumb{width:22px;height:22px}
@@ -82,6 +83,11 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px}
 .switches{display:grid}.switchrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}.switchrow:last-of-type{border:0}.switchrow small{display:block;margin-top:3px;color:var(--text-muted)}
 .switch{width:48px;height:28px;position:relative}.switch input{opacity:0}.track{position:absolute;inset:0;border:1px solid rgba(157,129,243,.3);border-radius:999px;background:rgba(255,255,255,.08)}.track:after{content:"";position:absolute;width:22px;height:22px;left:2px;top:2px;border-radius:50%;background:#d9d2e7;transition:.16s}.switch input:checked+.track{background:var(--accent-1)}.switch input:checked+.track:after{transform:translateX(20px);background:#fff8df}
 .subfield{padding:10px 0 2px}.subfield.disabled{opacity:.4}.subfield.disabled .segment{pointer-events:none}
+#promptList{display:grid}
+.promptitem{display:grid;gap:6px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.promptitem:last-of-type{border:0}
+.promptactions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.promptactions .btn{min-height:32px;font-size:10.5px}
 pre{margin:0;padding:11px 12px;border:1px solid rgba(157,129,243,.18);border-radius:8px;background:rgba(7,5,18,.44);font:11px/1.45 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
 .toast{display:none;margin-top:10px;padding:10px;border:1px solid rgba(74,222,128,.4);border-radius:8px;background:rgba(20,60,40,.2);color:#bbf7d0;font-size:11px}.toast.show{display:block}.toast.error{border-color:rgba(255,71,87,.45);background:rgba(127,29,29,.16);color:#fecaca}
@@ -92,11 +98,12 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00059</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00066</span></header>
 <form id="form" class="stack">
 
-<section class="card config"><div class="head"><h2 class="title">Configuration</h2><span class="note">Generation &amp; processing only</span></div><div class="body grid">
-<div class="field"><div class="row"><label>Preset</label><span id="presetHelp" class="help">No preset matches current settings</span></div><div class="configrow"><div class="presetwrap"><button id="presetButton" class="presetbutton" type="button"><span id="presetLabel">Custom</span><span class="chev">▾</span></button><div id="presetMenu" class="presetmenu"><button type="button" data-custom="1">Custom</button><div id="presetItems"></div></div></div><input id="settingsInput" class="file" type="file" accept=".txt,text/plain"><button id="importSettings" class="importbtn" type="button" title="Import artworks_settings.txt" aria-label="Import artworks_settings.txt">⇪</button></div></div>
+<section class="card config"><div class="head"><h2 class="title">Preset</h2><span class="note">Predefined library from presets.txt</span></div><div class="body grid">
+<div class="field"><div class="row"><label>Preset</label><span id="presetHelp" class="help">No preset matches current settings</span></div><div class="configrow"><div class="presetwrap"><button id="presetButton" class="presetbutton" type="button"><span id="presetLabel">Custom</span><span class="chev">▾</span></button><div id="presetMenu" class="presetmenu"><button type="button" data-custom="1">Custom</button><div id="presetItems"></div></div></div><input id="settingsInput" class="file" type="file" accept=".txt,text/plain"><button id="importSettings" class="importbtn" type="button" title="Import settings.txt" aria-label="Import settings.txt">⇪</button></div></div>
+<p class="help" style="text-align:left;font-size:9.5px;line-height:1.35;margin:0">Auto: switches to Custom when values differ from all presets</p>
 <p id="configFeedback" class="feedback"></p>
 </div></section>
 
@@ -105,7 +112,16 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <div class="grid" style="align-content:start;gap:6px"><input id="fileInput" class="file" type="file" accept="image/*"><button id="choose" class="btn" type="button">Choose image</button><input id="imagePath" type="text" value="" placeholder="Filename" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help" style="text-align:left;font-size:9.5px;line-height:1.35">Only the filename is sent — the Shortcut resolves it in Files, then Photos.</div></div>
 </div></section>
 
-<section class="card"><div class="head"><h2 class="title">Motion</h2><span id="promptCount" class="note"></span></div><div class="body"><textarea id="prompt">Static camera, subtle natural movement.</textarea></div></section>
+<section class="card"><div class="head"><h2 class="title">Motion</h2><span id="promptCount" class="note"></span></div><div class="body grid">
+<div id="promptList"></div>
+<button id="addPrompt" class="btn" type="button">+ Add prompt</button>
+<div id="motionModeField" class="field" hidden><div class="row"><label>Generation mode</label></div><div class="segment" style="--count:2">
+<input id="modeChain" type="radio" name="generationMode" value="chain" checked><label for="modeChain">Chain</label>
+<input id="modeParallel" type="radio" name="generationMode" value="parallel"><label for="modeParallel">Parallel</label>
+</div></div>
+<div id="combineField" class="switchrow" hidden><div><strong>Combine videos</strong><small>Assemble generated results in prompt order</small></div><label class="switch"><input id="combineVideos" type="checkbox" checked><span class="track"></span></label></div>
+<div id="maxParallelField" class="field" hidden><div class="row"><label>Max parallel tasks</label><span class="help">1–6</span></div><div class="range"><input id="maxParallelRange" type="range" min="1" max="6"><input id="maxParallel" type="number" min="1" max="6"></div></div>
+</div></section>
 
 <section class="card"><div class="head"><h2 class="title">Generation</h2><span id="limits" class="note"></span></div><div class="body grid">
 <div class="field"><label>Model</label><div class="segment" style="--count:2"><input id="ltx" type="radio" name="model" value="ltx-2.3" checked><label for="ltx">LTX 2.3</label><input id="wan" type="radio" name="model" value="wan-2.2"><label for="wan">Wan 2.2</label></div></div>
@@ -128,7 +144,11 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </div></div>
 </div></section>
 
-<section class="card"><div class="head"><h2 class="title">Command</h2><span class="note">filename + cmd sent as JSON</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
+<section class="card"><div class="head"><h2 class="title">Execution</h2><span class="note">Local run preferences</span></div><div class="body switches">
+<div class="switchrow"><div><strong>Play result when finished</strong><small>--sound · plays the completed video</small></div><label class="switch"><input id="playOnFinish" type="checkbox"><span class="track"></span></label></div>
+</div></section>
+
+<section class="card"><div class="head"><h2 class="title">Command Preview</h2><span class="note">filename + cmd sent as JSON</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
 </form>
 </main>
 <footer><div class="footerin"><button class="launch" type="submit" form="form">Launch Shortcut</button><span id="runStatus" class="pill ready">READY</span></div></footer>
@@ -136,17 +156,25 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 (()=>{"use strict";
 const SHORTCUT="Run Img2Video in a-Shell";
 const SCRIPT="~File Provider Storage/img2video_iphone.py";
-const OUTPUT="~File Provider Storage/img2video_output.mp4";
-const WORK_KEY="img2videoSafariV3";
+const WORK_KEY="img2videoSafariV4";
+const LEGACY_WORK_KEY="img2videoSafariV3";
 const LEGACY_PRESETS_KEY="img2videoPresetsV1";
 const PRESETS_URL="./presets.txt";
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
 const INTERPOLATION_FPS_CHOICES=[24,25,30,50,60];
 const GENERATION_KEYS=["model","resolution","performance","fps","frames","priority","optimizations","interpolation","interpolationFps"];
-const DEFAULTS={imagePath:"",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false,interpolationFps:24};
+const DEFAULTS={
+  imagePath:"",
+  prompts:["Static camera, subtle natural movement."],
+  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,
+  optimizations:false,interpolation:false,interpolationFps:24,
+  generationMode:"chain",combineVideos:true,maxParallelTasks:6,
+  playOnFinish:false
+};
 const KNOWN_MODELS=["ltx-2.3","wan-2.2"];
 const KNOWN_RES=["480p","720p","1080p"];
 const KNOWN_PERF=["speed","quality","express"];
+const KNOWN_MODES=["chain","parallel"];
 const $=id=>document.getElementById(id);
 const selectedValue=name=>document.querySelector(`input[name="${name}"]:checked`)?.value||"";
 const selectRadio=(name,value)=>{const item=document.querySelector(`input[name="${name}"][value="${CSS.escape(String(value))}"]`);if(item)item.checked=true};
@@ -156,6 +184,8 @@ let previewUrl="";
 let selectedFileName="";
 let presets={};
 let lastWorkJson=null;
+let lastCommand="";
+let promptList=DEFAULTS.prompts.slice();
 
 function readablePath(value){
   const source=String(value??"").trim();
@@ -188,10 +218,14 @@ function clamp(value,min,max,fallback){
   return Math.min(max,Math.max(min,Math.round(number)));
 }
 
+function sanitizePrompt(value){
+  return String(value??"").replace(/[\r\n]+/g," ").trim();
+}
+
 function state(){
   return{
     imagePath:readablePath($("imagePath").value),
-    prompt:$("prompt").value.replace(/[\r\n]+/g," ").trim(),
+    prompts:promptList.map(sanitizePrompt),
     model:selectedValue("model"),
     resolution:selectedValue("resolution"),
     performance:selectedValue("performance"),
@@ -200,7 +234,11 @@ function state(){
     priority:Number($("priority").value),
     optimizations:$("optimizations").checked,
     interpolation:$("interpolation").checked,
-    interpolationFps:Number(selectedValue("interpolationFps"))||DEFAULTS.interpolationFps
+    interpolationFps:Number(selectedValue("interpolationFps"))||DEFAULTS.interpolationFps,
+    generationMode:selectedValue("generationMode")||DEFAULTS.generationMode,
+    combineVideos:$("combineVideos").checked,
+    maxParallelTasks:Number($("maxParallel").value)||DEFAULTS.maxParallelTasks,
+    playOnFinish:$("playOnFinish").checked
   };
 }
 
@@ -213,22 +251,33 @@ function generationState(source=state()){
 function workJson(source=state()){return JSON.stringify(source)}
 function generationsEqual(a,b){return GENERATION_KEYS.every(key=>a[key]===b[key])}
 
+function argGroups(current){
+  const groups=[];
+  for(const prompt of current.prompts)groups.push("--prompt "+quote(prompt));
+  groups.push("--model "+current.model);
+  groups.push("--resolution "+current.resolution);
+  groups.push("--performance "+current.performance);
+  groups.push("--fps "+current.fps);
+  groups.push("--frames "+current.frames);
+  groups.push("--priority "+current.priority);
+  groups.push(current.optimizations?"--optimizations":"--no-optimizations");
+  groups.push(current.interpolation?"--interpolation":"--no-interpolation");
+  if(current.interpolation)groups.push("--interpolate "+current.interpolationFps);
+  if(current.prompts.length>1){
+    groups.push("--mode "+current.generationMode);
+    groups.push(current.combineVideos?"--combine-videos":"--no-combine-videos");
+    if(current.generationMode==="parallel")groups.push("--max-parallel-tasks "+current.maxParallelTasks);
+  }
+  if(current.playOnFinish)groups.push("--sound");
+  return groups;
+}
+
 function command(current){
-  const parts=[
-    "python",shellPath(SCRIPT),
-    "--prompt",quote(current.prompt),
-    "--model",current.model,
-    "--resolution",current.resolution,
-    "--performance",current.performance,
-    "--fps",current.fps,
-    "--frames",current.frames,
-    "--priority",current.priority,
-    current.optimizations?"--optimizations":"--no-optimizations",
-    current.interpolation?"--interpolation":"--no-interpolation"
-  ];
-  if(current.interpolation)parts.push("--interpolate",current.interpolationFps);
-  parts.push("--output",shellPath(OUTPUT));
-  return parts.join(" ");
+  return["python",shellPath(SCRIPT),...argGroups(current)].join(" ");
+}
+
+function commandPreview(current){
+  return["python "+shellPath(SCRIPT),...argGroups(current)].join("\n");
 }
 
 function shortcutPayload(current){return JSON.stringify({version:1,filename:basename(current.imagePath),cmd:command(current)})}
@@ -255,6 +304,54 @@ function applyInterpolationState(){
   const on=$("interpolation").checked;
   $("interpolationFpsField").classList.toggle("disabled",!on);
   for(const rate of INTERPOLATION_FPS_CHOICES)$("ifps"+rate).disabled=!on;
+}
+
+function updateMotionVisibility(){
+  const multi=promptList.length>=2;
+  $("motionModeField").hidden=!multi;
+  $("combineField").hidden=!multi;
+  $("maxParallelField").hidden=!(multi&&selectedValue("generationMode")==="parallel");
+}
+
+function makePromptButton(text,cls,index,disabled){
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="btn "+cls;
+  button.dataset.index=String(index);
+  button.textContent=text;
+  button.disabled=disabled;
+  return button;
+}
+
+function renderPromptList(){
+  const host=$("promptList");
+  host.textContent="";
+  promptList.forEach((text,index)=>{
+    const item=document.createElement("div");
+    item.className="promptitem";
+    const row=document.createElement("div");
+    row.className="row";
+    const label=document.createElement("label");
+    label.textContent="Prompt "+(index+1);
+    row.appendChild(label);
+    item.appendChild(row);
+    const textarea=document.createElement("textarea");
+    textarea.className="promptText";
+    textarea.dataset.index=String(index);
+    textarea.value=text;
+    textarea.setAttribute("aria-label","Prompt "+(index+1));
+    item.appendChild(textarea);
+    const actions=document.createElement("div");
+    actions.className="promptactions";
+    actions.append(
+      makePromptButton("↑ Move up","promptUp",index,index===0),
+      makePromptButton("↓ Move down","promptDown",index,index===promptList.length-1),
+      makePromptButton("✕ Delete","promptDelete",index,promptList.length===1)
+    );
+    item.appendChild(actions);
+    host.appendChild(item);
+  });
+  updateMotionVisibility();
 }
 
 function clearPreview(label="No image selected"){
@@ -292,13 +389,16 @@ function persistWork(current){
 
 function refresh({persist=true}={}){
   applyInterpolationState();
+  updateMotionVisibility();
   const current=state();
   $("imagePath").value=current.imagePath;
-  $("promptCount").textContent=current.prompt.length+" characters";
-  $("command").textContent=command(current);
+  $("promptCount").textContent=current.prompts.length+(current.prompts.length===1?" prompt":" prompts");
+  lastCommand=command(current);
+  $("command").textContent=commandPreview(current);
   const ready=Boolean(current.imagePath&&basename(current.imagePath));
   $("sourceStatus").textContent=ready?"FILE READY":"FILE REQUIRED";
   $("sourceStatus").className="pill"+(ready?" ready":"");
+  $("choose").textContent=ready?"Change image":"Choose image";
   if(!previewUrl){
     $("sourceName").textContent=ready?basename(current.imagePath):"No image selected";
     $("previewPlaceholder").textContent=ready?"Preview unavailable — choose again":"No image";
@@ -310,7 +410,7 @@ function refresh({persist=true}={}){
 function restore(saved,{persist=false}={}){
   const merged={...DEFAULTS,...saved};
   $("imagePath").value=readablePath(merged.imagePath||"");
-  $("prompt").value=merged.prompt;
+  promptList=Array.isArray(merged.prompts)&&merged.prompts.length?merged.prompts.slice():DEFAULTS.prompts.slice();
   selectRadio("model",KNOWN_MODELS.includes(merged.model)?merged.model:DEFAULTS.model);
   selectRadio("resolution",KNOWN_RES.includes(merged.resolution)?merged.resolution:DEFAULTS.resolution);
   selectRadio("performance",KNOWN_PERF.includes(merged.performance)?merged.performance:DEFAULTS.performance);
@@ -320,6 +420,11 @@ function restore(saved,{persist=false}={}){
   $("optimizations").checked=Boolean(merged.optimizations);
   $("interpolation").checked=Boolean(merged.interpolation);
   selectRadio("interpolationFps",String(INTERPOLATION_FPS_CHOICES.includes(Number(merged.interpolationFps))?merged.interpolationFps:DEFAULTS.interpolationFps));
+  selectRadio("generationMode",KNOWN_MODES.includes(merged.generationMode)?merged.generationMode:DEFAULTS.generationMode);
+  $("combineVideos").checked=merged.combineVideos!==undefined?Boolean(merged.combineVideos):DEFAULTS.combineVideos;
+  syncPair("maxParallelRange","maxParallel",merged.maxParallelTasks,1,6,DEFAULTS.maxParallelTasks);
+  $("playOnFinish").checked=Boolean(merged.playOnFinish);
+  renderPromptList();
   applyModelLimits();
   clearPreview(basename(merged.imagePath)||"No image selected");
   refresh({persist});
@@ -493,16 +598,48 @@ $("fileInput").addEventListener("change",event=>{
   refresh();
 });
 
+$("promptList").addEventListener("input",event=>{
+  const textarea=event.target.closest("textarea.promptText");
+  if(!textarea)return;
+  promptList[Number(textarea.dataset.index)]=textarea.value;
+});
+
+$("promptList").addEventListener("click",event=>{
+  const button=event.target.closest("button");
+  if(!button||button.disabled)return;
+  const index=Number(button.dataset.index);
+  if(button.classList.contains("promptUp")&&index>0){
+    [promptList[index-1],promptList[index]]=[promptList[index],promptList[index-1]];
+  }else if(button.classList.contains("promptDown")&&index<promptList.length-1){
+    [promptList[index+1],promptList[index]]=[promptList[index],promptList[index+1]];
+  }else if(button.classList.contains("promptDelete")&&promptList.length>1){
+    promptList.splice(index,1);
+  }else return;
+  renderPromptList();
+  refresh();
+});
+
+$("addPrompt").addEventListener("click",()=>{
+  promptList.push("");
+  renderPromptList();
+  const items=document.querySelectorAll("#promptList textarea.promptText");
+  items[items.length-1]?.focus();
+  refresh();
+});
+
 $("form").addEventListener("input",event=>{
   const target=event.target;
   if(target.id==="fileInput"||target.id==="settingsInput")return;
   if(target.name==="model")applyModelLimits();
+  if(target.name==="generationMode")updateMotionVisibility();
   if(target.id==="fpsRange")syncPair("fpsRange","fps",target.value,Number(target.min),Number(target.max),24);
   if(target.id==="fps")syncPair("fpsRange","fps",target.value,Number(target.min),Number(target.max),24);
   if(target.id==="framesRange")syncPair("framesRange","frames",target.value,Number(target.min),Number(target.max),360);
   if(target.id==="frames")syncPair("framesRange","frames",target.value,Number(target.min),Number(target.max),360);
   if(target.id==="priorityRange")syncPair("priorityRange","priority",target.value,1,5,1);
   if(target.id==="priority")syncPair("priorityRange","priority",target.value,1,5,1);
+  if(target.id==="maxParallelRange")syncPair("maxParallelRange","maxParallel",target.value,1,6,DEFAULTS.maxParallelTasks);
+  if(target.id==="maxParallel")syncPair("maxParallelRange","maxParallel",target.value,1,6,DEFAULTS.maxParallelTasks);
   if(target.id==="imagePath")syncPreviewToPath();
   refresh();
 });
@@ -510,18 +647,20 @@ $("form").addEventListener("input",event=>{
 $("form").addEventListener("change",event=>{
   if(event.target.id==="fileInput"||event.target.id==="settingsInput")return;
   if(event.target.name==="model")applyModelLimits();
+  if(event.target.name==="generationMode")updateMotionVisibility();
   refresh();
 });
 
 $("copy").addEventListener("click",async()=>{
   clearStatus();
-  try{await navigator.clipboard.writeText($("command").textContent);$("runStatus").textContent="COPIED"}
+  try{await navigator.clipboard.writeText(lastCommand);$("runStatus").textContent="COPIED"}
   catch{showError("Press and hold the command to copy it.")}
 });
 
 $("reset").addEventListener("click",()=>{
   clearPreview();
   try{localStorage.removeItem(WORK_KEY)}catch{}
+  try{localStorage.removeItem(LEGACY_WORK_KEY)}catch{}
   try{localStorage.removeItem(LEGACY_PRESETS_KEY)}catch{}
   restore(DEFAULTS,{persist:false});
   lastWorkJson=workJson(state());
@@ -534,12 +673,13 @@ $("form").addEventListener("submit",event=>{
   clearStatus();
   const current=state();
   if(!basename(current.imagePath))return showError("Choose an image or enter its filename.");
-  if(!current.prompt)return showError("Enter a motion prompt.");
+  if(!current.prompts.length||current.prompts.some(prompt=>!prompt))return showError("Enter a motion prompt for every prompt block.");
   location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(shortcutPayload(current));
 });
 
 window.addEventListener("pagehide",()=>{if(previewUrl)URL.revokeObjectURL(previewUrl)});
 try{localStorage.removeItem(LEGACY_PRESETS_KEY)}catch{}
+try{localStorage.removeItem(LEGACY_WORK_KEY)}catch{}
 let saved={};
 try{saved=JSON.parse(localStorage.getItem(WORK_KEY)||"{}")}catch{}
 restore({...DEFAULTS,...saved},{persist:false});
