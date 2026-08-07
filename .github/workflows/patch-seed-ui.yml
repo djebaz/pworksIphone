@@ -1,0 +1,115 @@
+# VERSION$00086$ | Edited: 07/08 | TIME: 14:10
+name: Patch Seed UI
+
+on:
+  push:
+    branches: ["agent/pr6-seed-command-preview-fixes"]
+    paths:
+      - ".github/workflows/patch-seed-ui.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: agent/pr6-seed-command-preview-fixes
+
+      - name: Apply Seed and preset UX patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("shortcuts/img2video/index.html")
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "<!-- VERSION$00084$ | Edited: 07/08 | TIME: 13:57 -->",
+                  "<!-- VERSION$00087$ | Edited: 07/08 | TIME: 14:10 -->",
+              ),
+              (
+                  '<span class="pill version">SAFARI UI · 00084</span>',
+                  '<span class="pill version">SAFARI UI · 00087</span>',
+              ),
+              (
+                  '.seedrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.seedrow .btn{min-width:96px}',
+                  '.seedrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.seedrow .btn{min-width:96px}.seedrow .btn[aria-pressed="true"]{color:var(--accent-1);border-color:rgba(251,191,36,.58);background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(236,72,153,.09),rgba(139,92,246,.15))}#seed:disabled{opacity:.45;cursor:not-allowed}',
+              ),
+              (
+                  '<div id="presetMenu" class="presetmenu"><button type="button" data-custom="1">Custom</button><div id="presetItems"></div></div>',
+                  '<div id="presetMenu" class="presetmenu"><div id="presetItems"></div></div>',
+              ),
+              (
+                  '<div class="field"><div class="row"><label for="seed">Seed</label><span id="seedHelp" class="help">Optional signed 64-bit integer</span></div><div class="seedrow"><input id="seed" type="text" value="" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Random"><button id="randomizeSeed" class="btn" type="button">Randomize</button></div></div>',
+                  '<div class="field"><div class="row"><label for="seed">Seed</label><span id="seedHelp" class="help">Explicit --seed · signed 64-bit integer</span></div><div class="seedrow"><input id="seed" type="text" value="42" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false"><button id="seedToggle" class="btn" type="button" aria-pressed="false">No CLI seed</button></div></div>',
+              ),
+              (
+                  '  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,seed:"",priority:1,',
+                  '  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,seed:"42",seedDisabled:false,priority:1,',
+              ),
+              (
+                  '    seed:$("seed").value.trim(),\n    priority:Number($("priority").value),',
+                  '    seed:$("seed").value.trim(),\n    seedDisabled:$("seedToggle").getAttribute("aria-pressed")==="true",\n    priority:Number($("priority").value),',
+              ),
+              (
+                  '  const seed=seedValue(current.seed);\n  if(seed.text)groups.push("--seed "+seed.text);',
+                  '  const seed=seedValue(current.seed);\n  if(!current.seedDisabled&&seed.text)groups.push("--seed "+seed.text);',
+              ),
+              (
+                  'function updateMotionVisibility(){',
+                  'function applySeedState(current){\n  const disabled=Boolean(current.seedDisabled);\n  $("seed").disabled=disabled;\n  $("seedToggle").setAttribute("aria-pressed",disabled?"true":"false");\n  const seed=seedValue(current.seed);\n  const valid=disabled||seed.valid;\n  $("seed").setAttribute("aria-invalid",valid?"false":"true");\n  $("seedHelp").textContent=disabled?"No --seed sent by Safari":seed.valid?"Explicit --seed · signed 64-bit integer":"Invalid signed 64-bit integer";\n  $("seedHelp").style.color=valid?"":"var(--danger-3)";\n}\n\nfunction updateMotionVisibility(){',
+              ),
+              (
+                  '  const current=state();\n  updateExecutionState(current);\n  const seed=seedValue(current.seed);\n  $("seed").setAttribute("aria-invalid",seed.valid?"false":"true");\n  $("seedHelp").textContent=seed.valid?"Optional signed 64-bit integer":"Invalid signed 64-bit integer";\n  $("seedHelp").style.color=seed.valid?"":"var(--danger-3)";',
+                  '  const current=state();\n  applySeedState(current);\n  updateExecutionState(current);',
+              ),
+              (
+                  '  $("seed").value=String(merged.seed??"");',
+                  '  const restoredSeed=String(merged.seed??"").trim();\n  $("seed").value=restoredSeed||DEFAULTS.seed;\n  $("seedToggle").setAttribute("aria-pressed",merged.seedDisabled?"true":"false");',
+              ),
+              (
+                  '  if(fields.seed!==undefined&&seedValue(fields.seed).valid)$("seed").value=seedValue(fields.seed).text;',
+                  '  if(fields.seed!==undefined&&seedValue(fields.seed).valid){\n    const parsedSeed=seedValue(fields.seed);\n    if(parsedSeed.text){$("seed").value=parsedSeed.text;$("seedToggle").setAttribute("aria-pressed","false")}\n    else $("seedToggle").setAttribute("aria-pressed","true");\n  }',
+              ),
+              (
+                  '  if(button.dataset.custom)return;\n  const preset=presets[button.dataset.name];',
+                  '  const preset=presets[button.dataset.name];',
+              ),
+              (
+                  '$("randomizeSeed").addEventListener("click",()=>{\n  let value;\n  try{\n    const words=new Uint32Array(2);\n    crypto.getRandomValues(words);\n    const unsigned=(BigInt(words[0])<<32n)|BigInt(words[1]);\n    value=unsigned>SEED_MAX?unsigned-(1n<<64n):unsigned;\n  }catch{\n    value=BigInt(Math.floor(Math.random()*0x7fffffff));\n  }\n  $("seed").value=value.toString();\n  refresh();\n});',
+                  '$("seedToggle").addEventListener("click",()=>{\n  const disabled=$("seedToggle").getAttribute("aria-pressed")!=="true";\n  $("seedToggle").setAttribute("aria-pressed",disabled?"true":"false");\n  refresh();\n});',
+              ),
+              (
+                  '  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");',
+                  '  if(!current.seedDisabled&&!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Expected source fragment not found: {old[:100]!r}")
+              text = text.replace(old, new, 1)
+
+          # The same validation line appears in Copy and Submit; patch the second occurrence too.
+          old = '  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");'
+          new = '  if(!current.seedDisabled&&!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");'
+          if old not in text:
+              raise SystemExit("Second Seed validation fragment not found")
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add shortcuts/img2video/index.html
+          git rm .github/workflows/patch-seed-ui.yml
+          git commit -m "Refine Seed and preset UX"
+          git push
