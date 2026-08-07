@@ -1,4 +1,4 @@
-<!-- VERSION$00003$ | Edited: 07/08 | TIME: 18:53 -->
+<!-- VERSION$00004$ | Edited: 07/08 | TIME: 18:57 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -19,7 +19,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 
 - [`decision-log.md`](decision-log.md) — explicit decisions and open choices from the discovery sessions.
 - [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
-- [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local credential model, threat model, storage strategy, CSP direction, and browser/API constraints.
+- [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local/user-owned credential model, Password AutoFill preference, threat model, CSP direction, and browser/API constraints.
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
@@ -37,15 +37,19 @@ Modern iOS Home Screen web apps can receive Web Push, but a server-side push sen
 
 ## Credentials
 
-**Selected direction:** each user supplies their own ArtWorks credentials; reusable credentials remain on that user's device and are never injected into GitHub Pages assets.
+**Selected direction:** each user supplies their own ArtWorks credentials; reusable credentials are never injected into GitHub Pages assets or committed to the repository.
 
-Raw `localStorage` is not selected for credential storage. The security research recommends studying an encrypted IndexedDB credential record using Web Crypto plus an explicit unlock step, while keeping ordinary task/history state in separate IndexedDB stores.
+**Preferred persistence approach:** use Safari/system Password AutoFill through a semantic username/password form, then keep the active credential in application memory while the PWA is unlocked. This delegates persistent credential storage to the user's password manager rather than creating an application-owned plaintext secret database.
+
+If the requirement is literally one physical device with no password-manager synchronization, the user's system Passwords/iCloud sync policy matters and must be treated separately from PWA storage.
+
+Raw `localStorage` is rejected for ArtWorks credentials. Encrypted IndexedDB + Web Crypto with an explicit unlock secret is a fallback to investigate only if real-device Password AutoFill testing is insufficient.
 
 Direct browser-to-ArtWorks requests remain contingent on verified CORS/preflight support.
 
 ## Recovery and history
 
-The PWA is intended to persist enough state to recover active and historical work safely:
+The PWA is intended to persist enough non-secret state to recover active and historical work safely:
 
 - configuration and prompt sets;
 - remote ArtWorks task IDs;
@@ -54,7 +58,9 @@ The PWA is intended to persist enough state to recover active and historical wor
 - completed/pending download state;
 - reusable run history.
 
-After interruption, the PWA should re-query existing non-terminal task IDs rather than creating duplicate potentially billable tasks.
+Use IndexedDB as the structured task/run/history store.
+
+After interruption, the PWA should re-query existing non-terminal task IDs rather than creating duplicate potentially billable tasks. If credentials are locked after a cold restart, persisted tasks remain visible and can show an authentication-required state until the user uses Password AutoFill or enters the credential again.
 
 Per-step timers are derived from persisted timestamps. They must not rely on browser timers continuing while iOS has suspended the PWA.
 
@@ -95,6 +101,7 @@ Unknowns must remain explicit. In particular, do not assume:
 - ArtWorks has or lacks a webhook until authoritative evidence is found;
 - a Service Worker continues running after the app is backgrounded;
 - automatic iOS downloads behave like desktop Chrome;
+- Password AutoFill behaves identically in every installed-PWA context until device-tested;
 - browser credential encryption eliminates XSS risk.
 
 No discovery-only API test should create a potentially billable task merely to answer a platform question that can be resolved by documentation, preflight, or a rejected validation request.
