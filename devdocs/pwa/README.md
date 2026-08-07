@@ -1,4 +1,4 @@
-<!-- VERSION$00012$ | Edited: 07/08 | TIME: 20:13 -->
+<!-- VERSION$00013$ | Edited: 07/08 | TIME: 20:41 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -28,6 +28,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
 - [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain strategy, preferring Mediabunny for remote MP4 reading and presentation-order final-frame decoding, with MP4Box.js + direct WebCodecs retained as a lower-level fallback.
 - [`orion-ios-extension-findings.md`](orion-ios-extension-findings.md) — direct inspection of two supplied Orion extension packages and the distinction between HTMLVideoElement control, privileged extension downloads, and PWA sample-level media access.
+- [`existing-browser-media-implementations.md`](existing-browser-media-implementations.md) — direct inspection of the private `mothanext` and `StreamsDL` repositories: WebCodecs/Mediabunny processing, HLS/DASH acquisition, real `206` Range validation, OPFS staging, FFmpeg-WASM resource costs, and the subset applicable to Img2Video.
 - [`implementation-plan.md`](implementation-plan.md) — current staged plan: non-billable viability gates, single prompt, serialized-submit parallel mode, Chain, and the conditions under which a relay/server decision could be reopened.
 
 ## Current direction
@@ -126,6 +127,25 @@ Project-specific constraints:
 MP4Box.js + direct WebCodecs remains the low-level fallback/debug path. `<video>` + canvas remains the simplest compatibility experiment.
 
 No video encoder, audio processing, output muxer, or ffmpeg.wasm is required for normal Chain advancement.
+
+## Existing browser-media reference implementations
+
+The owner's private `mothanext` and `StreamsDL` repositories provide directly inspected reference implementations for substantially harder browser-media workflows.
+
+`mothanext` contains MP4 sample/range processing, explicit DTS/PTS and B-frame handling, WebCodecs decode/encode, deterministic frame cleanup, muxing, and a Mediabunny integration path. This is the closest existing reference for the low-level media mechanics beneath Chain.
+
+`StreamsDL` contains HLS/DASH manifest parsing, segment acquisition, direct-MP4 metadata/range clipping, OPFS/internal staging, and FFmpeg-WASM remux/repair/merge/concat flows. Its Range guardrail is especially useful: when `Accept-Ranges` is absent, only a real one-byte `206 Partial Content` response establishes Range capability; a `200` full response must not be classified as proven random-access support.
+
+StreamsDL also documents the real cost of the heavyweight fallback: its active vendored FFmpeg WASM cores are approximately 24 MiB each before runtime memory expansion, it enforces an approximately 800 MiB input ceiling, and its accepted runtime handling includes actual `WebAssembly.Memory()` allocation failure/fallback behavior.
+
+These repositories reduce implementation uncertainty but do not change the selected production ordering:
+
+1. Mediabunny for Chain;
+2. `<video>` + canvas as the minimal compatibility experiment;
+3. low-level MP4/WebCodecs techniques from `mothanext` for diagnostics/fallback;
+4. FFmpeg-WASM techniques from `StreamsDL` only if a future requirement genuinely needs repair, format conversion, A/V muxing, or concatenation.
+
+Extension host/download/offscreen privileges do not transfer to the PWA. ArtWorks media CORS and real Range behavior still require Stage 0 validation from the production origin.
 
 ## Orion iOS extension findings
 
@@ -230,7 +250,7 @@ Relative manifest/icon/Service Worker paths/scopes remain required, but Service 
 
 The active plan is now:
 
-1. **Stage 0 — non-billable viability gates:** API CORS, result-media JavaScript access, origin trust, local Mediabunny fixture.
+1. **Stage 0 — non-billable viability gates:** API CORS, result-media JavaScript access including a real `206` Range probe, origin trust, local Mediabunny fixture.
 2. **Stage 1 — single prompt:** credential flow, ledger, reconciler, one serialized async creation, polling, staging/export.
 3. **Stage 2 — multi-prompt/parallel:** serialized creation, bounded concurrent known-ID work, durable partial completion.
 4. **Stage 3 — Chain:** Mediabunny final-frame extraction and persisted dependent-step advancement.
@@ -242,7 +262,7 @@ Video concatenation/assembly remains intentionally out of scope by product decis
 ## Remaining highest-value unknowns
 
 - ArtWorks API CORS from the real intended production origin;
-- ArtWorks result-media CORS/partial reads;
+- ArtWorks result-media CORS/partial reads, including whether a one-byte Range request returns a valid `206 Partial Content` response;
 - completed-task/result TTL and URL refresh behavior;
 - target-iPhone Password AutoFill behavior;
 - target-iPhone installed-PWA export behavior;
