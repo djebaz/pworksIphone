@@ -1,4 +1,4 @@
-# VERSION$00055$ | Edited: 07/08 | TIME: 08:40
+# VERSION$00056$ | Edited: 07/08 | TIME: 08:47
 """Generate a video from a local image with the ArtWorks API.
 
 Designed for a-Shell Mini on iPhone. Uses only Python's standard library.
@@ -1738,16 +1738,11 @@ def parse_args():
             f"{', '.join(str(rate) for rate in SUPPORTED_INTERPOLATION_FPS)} enum has "
             "conflicting path-specific evidence; the downloaded MP4 will be measured."
         )
-    else:
-        # Interpolation is inactive, so this stored preference will never reach
-        # the API. Keep it as a best-effort integer for generation_parameters()
-        # and recovery state without aborting the run over a value it will
-        # never transmit; an unusable value only becomes an error once
-        # interpolation is actually turned on.
-        try:
-            args.interpolation_fps = int(args.interpolation_fps)
-        except (TypeError, ValueError):
-            args.interpolation_fps = DEFAULT_INTERPOLATION_FPS
+    # When interpolation is inactive, args.interpolation_fps is left exactly as
+    # configured -- not validated, not int()-coerced, not replaced with
+    # DEFAULT_INTERPOLATION_FPS -- because it is an inert stored preference that
+    # will never reach the API. It only becomes subject to validate_interpolation_fps()
+    # once interpolation is actually turned on.
 
     args.tags = list(args.tag if args.tag is not None else settings.get("tag", []))
     args.loras = [parse_lora(value) for value in args.lora] if args.lora else settings.get("lora", [])
@@ -2877,22 +2872,21 @@ def normalize_recovery_parameters(state: dict, args) -> None:
             parameters["priority"] = 1 if parameters.get("isFast") else args.priority
             warned_priority = True
         parameters.setdefault("tags", [])
+        # A missing key (recovery state from before interpolationFps existed at
+        # all) gets the documented default; this is filling in an absent value,
+        # not rewriting a stored one.
         parameters.setdefault("interpolationFps", DEFAULT_INTERPOLATION_FPS)
         # A resumed run reuses these stored parameters verbatim instead of the
         # freshly parsed CLI values. interpolationFps is validated against the
-        # current documented enum, not silently rewritten to a model-derived
-        # value -- but only when applyInterpolation is actually true, so an
-        # inactive stored preference that will never reach the API cannot block
-        # resuming an otherwise-valid recovery state.
+        # current documented enum only when applyInterpolation is actually true.
+        # When it is false, the stored value is left exactly as-is -- not
+        # validated, not coerced, not replaced -- since it is an inert
+        # preference for a recovered task that will never transmit it to the
+        # API, and cannot block resuming an otherwise-valid recovery state.
         if parameters.get("applyInterpolation"):
             parameters["interpolationFps"] = validate_interpolation_fps(
                 parameters["interpolationFps"], source="recovery-state interpolationFps"
             )
-        else:
-            try:
-                parameters["interpolationFps"] = int(parameters["interpolationFps"])
-            except (TypeError, ValueError):
-                parameters["interpolationFps"] = DEFAULT_INTERPOLATION_FPS
         parameters.setdefault("loras", [])
         parameters.pop("isFast", None)
     if warned_model:
