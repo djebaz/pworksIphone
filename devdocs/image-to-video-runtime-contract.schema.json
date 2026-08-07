@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:pworksiphone:artworks:image-to-video-runtime-contract:1",
+  "$id": "urn:pworksiphone:artworks:image-to-video-runtime-contract:2",
   "title": "pworksIphone ArtWorks.ai Image-to-Video Derived Runtime Contract",
   "description": "Project-derived production request contract for ArtWorks.ai PaaS v3 image-to-video tasks. This is not the provider OpenAPI document.",
   "type": "object",
@@ -68,13 +68,13 @@
           "type": "integer",
           "minimum": 8,
           "maximum": 24,
-          "description": "Request FPS. Model-specific maxima are enforced by conditional rules below. Do not use this value as final encoded FPS."
+          "description": "Generation request FPS. Model-specific maxima are enforced below. This is distinct from native/output FPS and interpolationFps."
         },
         "numFrames": {
           "type": "integer",
           "minimum": 24,
           "maximum": 361,
-          "description": "Requested frame count. Model-specific maxima are enforced by conditional rules below. Accepted counts may be normalized in completed media."
+          "description": "Requested frame count. Model-specific maxima are enforced below. Accepted counts may be normalized in completed media."
         },
         "resolution": {
           "type": "string",
@@ -83,7 +83,7 @@
             "720p",
             "1080p"
           ],
-          "description": "Only the currently documented and runtime-confirmed ArtWorks image-to-video resolutions."
+          "description": "Currently documented and runtime-confirmed ArtWorks image-to-video resolutions."
         },
         "performance": {
           "type": "string",
@@ -100,15 +100,20 @@
         },
         "applyInterpolation": {
           "type": "boolean",
-          "description": "Explicit project request switch. Runtime visual effect remains unresolved."
+          "description": "Documented boolean switch controlling whether interpolation is requested."
         },
         "interpolationFps": {
           "type": "integer",
+          "format": "int32",
+          "default": 24,
           "enum": [
-            16,
-            24
+            24,
+            25,
+            30,
+            50,
+            60
           ],
-          "description": "Confirmed executor-accepted values. Omit when applyInterpolation is false; when true, use 16 for Wan and 24 for LTX."
+          "description": "Documented interpolation target FPS. This is separate from generation request fps and from native/non-interpolated encoded FPS. Runtime support inside the documented enum has conflicting path-specific evidence."
         },
         "seed": {
           "type": "integer",
@@ -230,14 +235,10 @@
             "properties": {
               "applyInterpolation": {
                 "const": true
-              },
-              "model": {
-                "const": "wan-2.2"
               }
             },
             "required": [
-              "applyInterpolation",
-              "model"
+              "applyInterpolation"
             ]
           }
         },
@@ -250,49 +251,7 @@
           "payload": {
             "required": [
               "interpolationFps"
-            ],
-            "properties": {
-              "interpolationFps": {
-                "const": 16
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "payload": {
-            "properties": {
-              "applyInterpolation": {
-                "const": true
-              },
-              "model": {
-                "const": "ltx-2.3"
-              }
-            },
-            "required": [
-              "applyInterpolation",
-              "model"
             ]
-          }
-        },
-        "required": [
-          "payload"
-        ]
-      },
-      "then": {
-        "properties": {
-          "payload": {
-            "required": [
-              "interpolationFps"
-            ],
-            "properties": {
-              "interpolationFps": {
-                "const": 24
-              }
-            }
           }
         }
       }
@@ -323,7 +282,13 @@
     "status": "derived",
     "officialProviderSchema": false,
     "taskType": "image-to-video",
-    "evidencePolicy": "Hard validation encodes documented provider constraints, confirmed runtime constraints, and explicit project safety policy. Inferred and user-reported behavior is intentionally not promoted into validation rules.",
+    "fpsConcepts": {
+      "requestFps": "payload.fps; model-specific generation request range",
+      "nativeOutputFps": "measured media property; not an interpolation constraint",
+      "interpolationFps": "separate documented target enum 24|25|30|50|60"
+    },
+    "interpolationEvidence": "Historical interpolationFps=30 late failure and user-reported working Wan 30 are conflicting path-specific evidence; neither is promoted to a universal hard constraint.",
+    "evidencePolicy": "Hard validation encodes documented provider constraints, confirmed runtime constraints, and explicit project safety policy. Conflicting, inferred, and user-reported behavior is intentionally not promoted into universal validation rules.",
     "sources": [
       "../AGENTS.md",
       "api.md"
