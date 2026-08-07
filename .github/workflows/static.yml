@@ -1,4 +1,4 @@
-# VERSION$00080$ | Edited: 07/08 | TIME: 13:47
+# VERSION$00081$ | Edited: 07/08 | TIME: 13:53
 # Publishes main at the Pages root and every open PR under /preview/pr-<number>/.
 
 name: Deploy Img2Video to GitHub Pages
@@ -84,17 +84,19 @@ jobs:
 
           base_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
           {
-            echo "### GitHub Pages deployment"
+            echo "## Img2Video GitHub Pages"
             echo
-            echo "Production: ${base_url}/"
+            echo "- **Production:** [${base_url}/](${base_url}/)"
+            echo "- **Preview index:** [${base_url}/preview/](${base_url}/preview/)"
             echo
             if ((${#prs[@]})); then
-              echo "Open PR previews:"
+              echo "### Open PR previews"
+              echo
               for pr in "${prs[@]}"; do
-                echo "- PR #${pr}: ${base_url}/preview/pr-${pr}/"
+                echo "- **PR #${pr}:** [${base_url}/preview/pr-${pr}/](${base_url}/preview/pr-${pr}/)"
               done
             else
-              echo "No open PR previews."
+              echo "_No open PR previews._"
             fi
           } >> "${GITHUB_STEP_SUMMARY}"
 
