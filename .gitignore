@@ -1,4 +1,4 @@
-# VERSION$00031$ | Edited: 07/08 | TIME: 04:45
+# VERSION$00038$ | Edited: 07/08 | TIME: 05:57
 
 # -----------------------------------------------------------------------------
 # Credentials and secrets
@@ -17,6 +17,7 @@ prompts.txt
 randomprompt.txt
 
 # Keep repository templates/examples.
+!artworks_credentials.example.txt
 !artworks_settings.example.txt
 !prompts.example.txt
 !randomprompt.example.txt
