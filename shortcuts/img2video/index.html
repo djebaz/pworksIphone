@@ -1,4 +1,4 @@
-<!-- VERSION$00028$ | Edited: 06/08 | TIME: 23:42 -->
+<!-- VERSION$00051$ | Edited: 07/08 | TIME: 08:00 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,6 +17,7 @@ textarea,input[type=text],input[type=number]{width:100%;border:1px solid rgba(15
 .range{display:grid;grid-template-columns:1fr 76px;gap:10px;align-items:center}input[type=range]{width:100%;accent-color:var(--amber)}.bounds{display:flex;justify-content:space-between;color:var(--muted);font-size:9px}
 .source{display:grid;grid-template-columns:1fr 112px;gap:12px}.preview{min-height:150px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:linear-gradient(125deg,#463054,#21162f 48%,#110c1d)}.preview img{width:100%;height:150px;display:none;object-fit:cover}.preview.has img{display:block}.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.4);font-size:11px;font-weight:800;text-transform:uppercase}.preview.has .placeholder{display:none}.shade{position:absolute;inset:auto 0 0;padding:25px 10px 8px;background:linear-gradient(transparent,rgba(7,5,18,.9));font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file{position:absolute;opacity:0;width:1px;height:1px}
 .switches{display:grid}.switchrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}.switchrow:last-child{border:0}.switchrow small{display:block;margin-top:3px;color:var(--muted)}.switch{width:48px;height:28px;position:relative}.switch input{opacity:0}.track{position:absolute;inset:0;border:1px solid rgba(157,129,243,.3);border-radius:999px;background:rgba(255,255,255,.08)}.track:after{content:"";position:absolute;width:22px;height:22px;left:2px;top:2px;border-radius:50%;background:#d9d2e7;transition:.16s}.switch input:checked+.track{background:linear-gradient(90deg,rgba(245,158,11,.58),rgba(236,72,153,.48),rgba(139,92,246,.56))}.switch input:checked+.track:after{transform:translateX(20px);background:#fff8df}
+.subfield{padding:10px 0 2px}.subfield.disabled{opacity:.4}.subfield.disabled .segment{pointer-events:none}
 pre{margin:0;padding:11px 12px;border:1px solid rgba(157,129,243,.18);border-radius:8px;background:rgba(7,5,18,.44);font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.toast{display:none;margin-top:10px;padding:10px;border:1px solid rgba(239,68,68,.45);border-radius:8px;background:rgba(127,29,29,.16);color:#fecaca;font-size:11px}.toast.show{display:block}
 footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10px,env(safe-area-inset-bottom));border-top:1px solid rgba(139,92,246,.22);background:rgba(7,5,18,.84);backdrop-filter:blur(18px)}.footerin{width:min(730px,100%);margin:auto;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.launch{min-height:48px;border:1px solid rgba(251,191,36,.66);border-radius:10px;color:#160f23;background:linear-gradient(110deg,var(--amber),#f8a933 42%,#f073ab 72%,#a98bff);font-size:14px;font-weight:850}
 @media(max-width:520px){header{align-items:flex-start}.version{display:none}.source{grid-template-columns:1fr}}
@@ -24,7 +25,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00028</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00051</span></header>
 <form id="form" class="stack">
 <section class="card"><div class="head"><h2 class="title">Source</h2><span id="sourceStatus" class="pill">FILE REQUIRED</span></div><div class="body grid">
 <div class="source"><div id="preview" class="preview"><img id="previewImage" alt=""><div class="placeholder">Select an image</div><div id="sourceName" class="shade">No image selected</div></div><div><input id="fileInput" class="file" type="file" accept="image/*"><button id="choose" class="btn" type="button">Choose image</button></div></div>
@@ -42,6 +43,13 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <section class="card"><div class="head"><h2 class="title">Processing</h2><span class="note">Explicit CLI booleans</span></div><div class="body switches">
 <div class="switchrow"><div><strong>Optimizations</strong><small>--optimizations / --no-optimizations</small></div><label class="switch"><input id="optimizations" type="checkbox"><span class="track"></span></label></div>
 <div class="switchrow"><div><strong>Interpolation</strong><small>--interpolation / --no-interpolation</small></div><label class="switch"><input id="interpolation" type="checkbox"><span class="track"></span></label></div>
+<div id="interpolationFpsField" class="field subfield"><div class="row"><label>Interpolation target</label><span class="help">Output interpolation FPS · not request FPS</span></div><div class="segment" style="--count:5">
+<input id="ifps24" type="radio" name="interpolationFps" value="24" checked><label for="ifps24">24</label>
+<input id="ifps25" type="radio" name="interpolationFps" value="25"><label for="ifps25">25</label>
+<input id="ifps30" type="radio" name="interpolationFps" value="30"><label for="ifps30">30</label>
+<input id="ifps50" type="radio" name="interpolationFps" value="50"><label for="ifps50">50</label>
+<input id="ifps60" type="radio" name="interpolationFps" value="60"><label for="ifps60">60</label>
+</div></div>
 </div></section>
 <section class="card"><div class="head"><h2 class="title">Command</h2><span class="note">filename + cmd sent as JSON</span></div><div class="body"><pre id="command"></pre><div class="actions"><button id="copy" class="btn" type="button">Copy command</button><button id="reset" class="btn" type="button">Reset</button></div><div id="toast" class="toast"></div></div></section>
 </form>
@@ -54,7 +62,11 @@ const SCRIPT="~File Provider Storage/img2video_iphone.py";
 const OUTPUT="~File Provider Storage/img2video_output.mp4";
 const KEY="img2videoSafariV3";
 const LIMITS={"wan-2.2":{fps:[8,16],frames:[24,160]},"ltx-2.3":{fps:[8,24],frames:[24,361]}};
-const DEFAULTS={imagePath:"",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false};
+// interpolationFps is the documented interpolation target enum (24|25|30|50|60,
+// default 24). It is independent of the selected model: switching model must
+// never change it, unlike the model-specific Request FPS/frame ranges above.
+const INTERPOLATION_FPS_CHOICES=[24,25,30,50,60];
+const DEFAULTS={imagePath:"",prompt:"Static camera, subtle natural movement.",model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,priority:1,optimizations:false,interpolation:false,interpolationFps:24};
 const $=id=>document.getElementById(id);
 const selectedValue=name=>document.querySelector(`input[name="${name}"]:checked`)?.value||"";
 const selectRadio=(name,value)=>{const item=document.querySelector(`input[name="${name}"][value="${value}"]`);if(item)item.checked=true};
@@ -107,12 +119,13 @@ function state(){
     frames:Number($("frames").value),
     priority:Number($("priority").value),
     optimizations:$("optimizations").checked,
-    interpolation:$("interpolation").checked
+    interpolation:$("interpolation").checked,
+    interpolationFps:Number(selectedValue("interpolationFps"))||DEFAULTS.interpolationFps
   };
 }
 
 function command(current){
-  return[
+  const parts=[
     "python",shellPath(SCRIPT),
     "--prompt",quote(current.prompt),
     "--model",current.model,
@@ -122,9 +135,13 @@ function command(current){
     "--frames",current.frames,
     "--priority",current.priority,
     current.optimizations?"--optimizations":"--no-optimizations",
-    current.interpolation?"--interpolation":"--no-interpolation",
-    "--output",shellPath(OUTPUT)
-  ].join(" ");
+    current.interpolation?"--interpolation":"--no-interpolation"
+  ];
+  // interpolationFps (the interpolation target) is only meaningful, and only
+  // emitted, when interpolation is actually enabled.
+  if(current.interpolation)parts.push("--interpolate",current.interpolationFps);
+  parts.push("--output",shellPath(OUTPUT));
+  return parts.join(" ");
 }
 
 function shortcutPayload(current){
@@ -167,6 +184,12 @@ function applyModelLimits(){
   $("limits").textContent=`${limits.fps[0]}–${limits.fps[1]} FPS · ${limits.frames[0]}–${limits.frames[1]} frames`;
 }
 
+function applyInterpolationState(){
+  const on=$("interpolation").checked;
+  $("interpolationFpsField").classList.toggle("disabled",!on);
+  for(const rate of INTERPOLATION_FPS_CHOICES)$("ifps"+rate).disabled=!on;
+}
+
 function clearPreview(label="No image selected"){
   if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=""}
   selectedFileName="";
@@ -182,6 +205,7 @@ function syncPreviewToPath(){
 }
 
 function refresh(){
+  applyInterpolationState();
   const current=state();
   $("imagePath").value=current.imagePath;
   $("promptCount").textContent=current.prompt.length+" characters";
@@ -204,6 +228,10 @@ function restore(saved){
   syncPair("priorityRange","priority",saved.priority,1,5,1);
   $("optimizations").checked=Boolean(saved.optimizations);
   $("interpolation").checked=Boolean(saved.interpolation);
+  selectRadio("interpolationFps",String(
+    INTERPOLATION_FPS_CHOICES.includes(Number(saved.interpolationFps))
+      ?saved.interpolationFps:DEFAULTS.interpolationFps
+  ));
   applyModelLimits();
   clearPreview(basename(saved.imagePath)||"No image selected");
   refresh();
