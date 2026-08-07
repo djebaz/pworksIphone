@@ -1,4 +1,4 @@
-<!-- VERSION$00001$ | Edited: 07/08 | TIME: 18:20 -->
+<!-- VERSION$00002$ | Edited: 07/08 | TIME: 19:52 -->
 # PWA Implementation Plan
 
 ## Purpose
@@ -48,7 +48,7 @@ Status: in progress.
 - document GitHub Pages deployment topology;
 - determine credential architecture;
 - determine ArtWorks CORS/browser feasibility;
-- identify features that require native/FFmpeg functionality;
+- identify features that require browser-native media libraries versus shell/FFmpeg functionality;
 - choose the first PWA functional milestone.
 
 ### Exit criteria
@@ -140,20 +140,47 @@ Do not assume browser background execution is equivalent to a long-running Pytho
 
 ## Phase 5 — chain mode feasibility
 
-Chain mode is a separate technical problem because the existing Python client extracts the last video frame through FFmpeg and uses that frame as the next image.
+Chain mode requires the final displayed frame of the previous ArtWorks video as the image for the next task, but it does **not** require video re-encoding, audio processing, or output muxing.
 
-Study browser-native alternatives before adding FFmpeg/WASM:
+The preferred implementation candidate is now **Mediabunny**, not FFmpeg/WASM.
 
-1. load the completed video into a browser video element;
-2. seek reliably to the final decodable frame;
-3. draw the frame to a canvas;
-4. export a Blob suitable for the next ArtWorks image payload;
-5. verify cross-origin permissions on result media;
-6. verify reliability on iPhone Safari/standalone mode.
+### Preferred path
 
-If this is unreliable, compare that limitation with the cost/size/memory impact of FFmpeg/WASM or a server-side media helper.
+1. construct a Mediabunny `Input` backed by `UrlSource` for the completed result URL;
+2. obtain the primary video track;
+3. call `InputVideoTrack.canDecode()` before attempting Chain advancement;
+4. use `VideoSampleSink.getSample(Infinity)` to retrieve the final decoded frame in presentation order;
+5. draw/export that `VideoSample` through canvas as a JPEG/PNG Blob;
+6. persist the transition-image state;
+7. submit the next ArtWorks task and immediately persist its remote task ID.
 
-Do not add a large WASM media stack without evidence that it is necessary and viable on the target iPhone.
+Mediabunny is attractive here because it already combines MP4 parsing, optimized remote media reads, sample timing/presentation-order handling, and WebCodecs-backed decoding behind a higher-level API.
+
+### Fallback/debug paths
+
+Retain two lower-level options for validation and troubleshooting:
+
+- MP4Box.js + direct WebCodecs for explicit MP4/sample/decode control;
+- `<video>` + canvas as the simplest compatibility prototype.
+
+Do not add ffmpeg.wasm for Chain unless all lighter browser-native/library approaches fail on representative ArtWorks output media.
+
+### Required validation
+
+Before Chain can submit its first billable task on a device:
+
+- validate the selected media library against a local/non-billable H.264 MP4 fixture;
+- confirm the actual track is decodable on target iPhone/iOS;
+- confirm final-frame retrieval/export produces a valid non-empty image Blob;
+- separately verify ArtWorks result-media CORS and partial-read behavior using an already-paid result where possible;
+- measure actual network bytes, peak memory and selected vendored bundle size;
+- verify the extracted frame is accepted as the next ArtWorks task input.
+
+### Dependency policy
+
+If Mediabunny is selected for production, pin and vendor a reviewed build under the repository-controlled `pwa/` source. Do not load credential-adjacent runtime code from a third-party CDN.
+
+Keep Python + `ffprobe`/project probes as the authoritative deep media measurement and provider-discovery environment; the PWA uses only the media functionality required for the production workflow.
 
 ## Phase 6 — video assembly feasibility
 
