@@ -1,0 +1,98 @@
+# VERSION$00031$ | Edited: 07/08 | TIME: 04:45
+
+# -----------------------------------------------------------------------------
+# Credentials and secrets
+# -----------------------------------------------------------------------------
+artworks_credentials.txt
+*credentials*.txt
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------------------------------------
+# Local mutable configuration and prompts
+# -----------------------------------------------------------------------------
+artworks_settings.txt
+prompts.txt
+randomprompt.txt
+
+# Keep repository templates/examples.
+!artworks_settings.example.txt
+!prompts.example.txt
+!randomprompt.example.txt
+
+# -----------------------------------------------------------------------------
+# Runtime state and recovery files
+# -----------------------------------------------------------------------------
+artworks_tasks.json
+*.state.json
+*.pid
+
+# -----------------------------------------------------------------------------
+# Logs and temporary files
+# -----------------------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+*.part
+*.bak
+*.swp
+*~
+
+# ChatGPT/local delivery copies are disposable and must never become source.
+delivery_*/
+
+# -----------------------------------------------------------------------------
+# Generated media and local input media
+# -----------------------------------------------------------------------------
+*.mp4
+*.mov
+*.m4v
+*.avi
+*.mkv
+*.webm
+*.wav
+*.mp3
+
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.heif
+*.webp
+*.gif
+
+# Allow deliberately tracked fixtures/reference media if added later.
+!tests/fixtures/**
+!devdocs/evidence/**
+!devdocs/references/**
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# -----------------------------------------------------------------------------
+# Editors and operating systems
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# -----------------------------------------------------------------------------
+# Common local archives / extracted deliveries
+# -----------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.tgz

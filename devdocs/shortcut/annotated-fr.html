@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Run Img2Video in a-Shell — workflow annoté</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0b0b0d;
+    font-family:"Helvetica Neue", Helvetica, "DejaVu Sans", Arial, sans-serif;
+    width:1720px;
+    padding:0 0 60px 0;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- en-tête ---------- */
+  .titlebar { display:flex; align-items:center; gap:16px; padding:30px 34px 10px 34px; }
+  .back { width:56px; height:56px; border-radius:50%; background:#1c1c1e; color:#fff;
+          font-size:30px; display:flex; align-items:center; justify-content:center; padding-bottom:4px; }
+  .appicon { width:46px; height:46px; border-radius:11px;
+             background:linear-gradient(160deg,#cbb18c,#a8875e);
+             display:flex; align-items:center; justify-content:center; color:#fff; font-size:22px; }
+  .apptitle { color:#fff; font-size:30px; font-weight:600; letter-spacing:-.3px; }
+  .subtitle { color:#7e7e86; font-size:21px; padding:0 34px 26px 140px; line-height:1.5; }
+
+  /* ---------- grille : flux à gauche, annotations à droite ---------- */
+  .flow { padding:0 30px; }
+  .step { display:flex; align-items:flex-start; gap:0; }
+  .left  { width:1000px; flex:0 0 1000px; position:relative; }
+  .right { flex:1; padding:6px 0 0 30px; }
+  .left.indent { padding-left:56px; }
+
+  .link { width:2px; height:26px; background:#3a3a3c; margin:0 auto; }
+  .left.indent .link { margin-left:calc(50% - 28px); }
+  .card { background:#252527; border-radius:22px; padding:22px 24px; position:relative; }
+  .gap { height:26px; }
+
+  .head { display:flex; align-items:flex-start; gap:14px; }
+  .icon { width:44px; height:44px; border-radius:11px; flex:0 0 44px;
+          display:flex; align-items:center; justify-content:center;
+          font-size:22px; font-weight:700; color:#fff; }
+  .i-blue{background:#0a84ff}.i-orange{background:#f0902c}
+  .i-yellow{background:#f5c43a;color:#5a4200}.i-gray{background:#8e8e93}
+  .i-photo{background:linear-gradient(135deg,#f6c445,#e8534a 45%,#3fb0e8)}
+  .i-mini{background:#f5c43a;color:#4a3800}
+
+  .txt { color:#fff; font-size:28px; line-height:1.5; letter-spacing:-.2px; flex:1; padding-top:5px; }
+  .close { width:38px; height:38px; border-radius:50%; background:#3a3a3c; color:#8e8e93;
+           font-size:20px; flex:0 0 38px; display:flex; align-items:center;
+           justify-content:center; margin-top:4px; }
+
+  .tok { display:inline-block; background:#123252; color:#4a9eff;
+         border-radius:8px; padding:2px 10px; white-space:nowrap; }
+  .tok .dot { display:inline-block; width:22px; height:22px; border-radius:5px;
+              vertical-align:-4px; margin-right:7px; font-size:13px; color:#fff;
+              text-align:center; line-height:22px; font-weight:700; }
+  .d-orange{background:#f0902c}.d-yellow{background:#f5c43a;color:#5a4200!important}
+  .d-blue{background:#0a84ff}
+  .d-photo{background:linear-gradient(135deg,#f6c445,#e8534a 45%,#3fb0e8)}
+  .arrow { display:inline-block; width:28px; height:28px; border-radius:50%;
+           border:2px solid #2a6fb8; color:#4a9eff; font-size:15px;
+           text-align:center; line-height:24px; vertical-align:-4px; margin-left:6px; }
+
+  .body { margin-top:18px; border-top:1px solid #333335; }
+  .subtext { color:#fff; font-size:25px; line-height:1.5; padding:16px 4px 2px; }
+  .muted { color:#9a9a9e; }
+
+  .optrow { display:flex; align-items:center; justify-content:space-between;
+            padding:15px 4px; border-bottom:1px solid #333335; color:#fff; font-size:25px; }
+  .optrow:last-child { border-bottom:none; }
+  .optval { color:#4a9eff; }
+  .switch { width:70px; height:40px; border-radius:20px; background:#31c25a; position:relative; }
+  .switch::after { content:""; position:absolute; top:3px; right:3px;
+                   width:34px; height:34px; border-radius:50%; background:#fff; }
+  .stepper { display:flex; background:#3a3a3c; border-radius:10px; overflow:hidden; }
+  .stepper span { width:50px; height:40px; display:flex; align-items:center;
+                  justify-content:center; color:#fff; font-size:23px; }
+  .stepper span:first-child { border-right:1px solid #4d4d50; }
+
+  .filterline { display:flex; align-items:center; gap:12px; padding:15px 4px;
+                border-bottom:1px solid #333335; color:#fff; font-size:25px;
+                line-height:1.5; flex-wrap:wrap; }
+  .circleminus { margin-left:auto; width:32px; height:32px; border-radius:50%;
+                 border:2px solid #4a9eff; color:#4a9eff; display:flex;
+                 align-items:center; justify-content:center; font-size:19px;
+                 padding-bottom:3px; flex:0 0 32px; }
+  .addfilter { display:flex; align-items:center; gap:12px; padding:16px 4px;
+               color:#4a9eff; font-size:25px; border-bottom:1px solid #333335; }
+  .circleplus { width:32px; height:32px; border-radius:50%; border:2px solid #4a9eff;
+                color:#4a9eff; display:flex; align-items:center; justify-content:center;
+                font-size:19px; padding-bottom:3px; }
+  .mono { font-size:26px; color:#fff; padding:18px 4px 6px; line-height:1.6; }
+  .cmdline { font-size:25px; color:#fff; padding:13px 4px; line-height:1.5;
+             border-bottom:1px solid #333335; }
+  .cmdline:last-child { border-bottom:none; }
+  .empty { color:#6f6f74; font-size:23px; font-style:italic; padding:14px 4px 2px; }
+
+  /* ---------- annotations ---------- */
+  .note { border-left:3px solid #3a3a3c; padding:2px 0 2px 22px; }
+  .note h4 { color:#e8e8ec; font-size:22px; font-weight:600; margin-bottom:9px; letter-spacing:-.1px; }
+  .note p  { color:#9a9aa2; font-size:20px; line-height:1.62; margin-bottom:9px; }
+  .note p:last-child { margin-bottom:0; }
+  .note code { background:#1c1c22; color:#c8a2ff; padding:2px 7px;
+               border-radius:5px; font-family:"DejaVu Sans Mono",monospace; font-size:18px; }
+  .note .k { color:#d8d8de; }
+  .note.key    { border-left-color:#0a84ff; }
+  .note.branch { border-left-color:#f0902c; }
+  .note.warn   { border-left-color:#e5a13a; }
+  .tag { display:inline-block; font-size:15px; letter-spacing:.9px; text-transform:uppercase;
+         color:#6f6f7a; margin-bottom:8px; font-weight:700; }
+  .tag.key{color:#4a9eff}.tag.branch{color:#f0902c}.tag.warn{color:#e5a13a}
+
+  /* ---------- encadrés de section ---------- */
+  .band { margin:34px 30px 26px 30px; padding:22px 26px; border-radius:16px;
+          background:#141419; border:1px solid #232329; }
+  .band h3 { color:#fff; font-size:24px; margin-bottom:12px; }
+  .band p  { color:#9a9aa2; font-size:20px; line-height:1.62; margin-bottom:8px; }
+  .band p:last-child{margin-bottom:0}
+  .band code { background:#1c1c22; color:#c8a2ff; padding:2px 7px; border-radius:5px;
+               font-family:"DejaVu Sans Mono",monospace; font-size:18px; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="back">‹</div>
+  <div class="appicon">▤</div>
+  <div class="apptitle">Run Img2Video in a-Shell</div>
+</div>
+<div class="subtitle">
+  14 actions · reçoit un dictionnaire <code style="background:#1c1c22;color:#c8a2ff;padding:2px 7px;border-radius:5px;font-size:18px">{ filename, cmd }</code>
+  depuis la feuille de partage, garantit que l’image est présente sur disque, puis lance la commande dans a-Shell Mini.
+</div>
+
+<div class="band">
+  <h3>Le problème que ce raccourci résout</h3>
+  <p>a-Shell ne peut lire que des fichiers présents dans son propre espace <span style="color:#d8d8de">File Provider Storage</span>. Une image qui vit uniquement dans la photothèque iOS lui est invisible.</p>
+  <p>Le raccourci vérifie donc d’abord si le fichier demandé est déjà sur disque. Si oui, il ne fait rien. Sinon, il va le chercher dans Photos et l’y écrit — puis, dans les deux cas, il exécute la commande sur un chemin qui existe forcément.</p>
+</div>
+
+<div class="flow">
+
+  <!-- ENTREE -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-blue">↓</div>
+          <div class="txt">Recevoir <span class="tok">Apps et 18 de plus</span> depuis <span class="tok">Feuille partagée</span></div>
+        </div>
+        <div class="subtext muted">S’il n’y a aucune entrée :
+          <div style="margin-top:12px"><span class="tok">Demander</span>&nbsp;&nbsp;<span class="tok">Texte</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">Entrée</div>
+      <h4>Point d’entrée depuis une autre app</h4>
+      <p>Le raccourci est une extension de partage. L’appelant lui passe du texte JSON.</p>
+      <p>Le repli <span class="k">Demander Texte</span> permet de le lancer à la main pour tester, sans passer par la feuille de partage.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 1 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-orange">▤</div>
+          <div class="txt">Obtenir le dictionnaire de <span class="tok"><span class="dot d-blue">↓</span>Entrée de raccourci</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-orange">▤</span>JSON</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">1</div>
+      <h4>Parsing du JSON</h4>
+      <p>Convertit le texte reçu en dictionnaire exploitable. Deux clés sont attendues : <code>filename</code> et <code>cmd</code>.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 2 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-orange">▤</div>
+          <div class="txt">Obtenir <span class="tok">Valeur</span> pour <span class="tok">filename</span> dans <span class="tok"><span class="dot d-orange">▤</span>JSON</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-orange">▤</span>filename</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">2</div>
+      <h4>Le nom de fichier demandé</h4>
+      <p>Nom complet avec extension, par exemple <code>IMG_1234.HEIC</code>. C’est la référence à laquelle tout le reste sera comparé.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 3 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-blue">▤</div>
+          <div class="txt">Récupérer le fichier depuis <span class="tok">Sur mon iPhone</span> au chemin <span class="tok"><span class="dot d-orange">▤</span>filename</span><span class="arrow">›</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">Erreur si introuvable : <span class="tok">désactivé</span> &nbsp;&nbsp;→ <span class="tok"><span class="dot d-blue">▤</span>Inputfile</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note key">
+      <div class="tag key">3 · pivot</div>
+      <h4>Tentative de lecture sur disque</h4>
+      <p>C’est l’action centrale du raccourci. On tente d’ouvrir le fichier dans <span class="k">File Provider Storage</span>.</p>
+      <p>Comme <span class="k">Erreur si introuvable</span> est désactivé, un échec n’interrompt pas le raccourci — mais la sortie n’est pas vide pour autant : <b style="color:#d8d8de">iOS retombe alors sur les propriétés du dossier parent</b>.</p>
+      <p>D’où la nécessité d’un test explicite plus bas, plutôt qu’un simple « est-ce vide ? ».</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 4 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-yellow">≡</div>
+          <div class="txt">Scinder <span class="tok"><span class="dot d-orange">▤</span>filename</span> selon <span class="tok">Personnalisé</span> <span class="tok">.</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-yellow">≡</span>CutDotList</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">4</div>
+      <h4>Séparation nom / extension</h4>
+      <p><code>IMG_1234.HEIC</code> → <code>["IMG_1234", "HEIC"]</code></p>
+      <p>Sans ambiguïté : iOS interdit les points dans les noms de la photothèque, la liste a donc toujours exactement deux éléments.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 5 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-orange">≡</div>
+          <div class="txt">Obtenir <span class="tok">Premier élément</span> depuis <span class="tok"><span class="dot d-yellow">≡</span>CutDotList</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-orange">≡</span>trimmedFilename</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">5</div>
+      <h4>Nom sans extension</h4>
+      <p>Servira deux fois : dans le test d’existence, puis comme critère de recherche dans Photos — la photothèque indexe les noms sans extension.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 6 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-orange">≡</div>
+          <div class="txt">Obtenir <span class="tok">Dernier élément</span> depuis <span class="tok"><span class="dot d-yellow">≡</span>CutDotList</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-orange">≡</span>TrimmedExr</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">6</div>
+      <h4>Extension seule</h4>
+      <p>Deuxième moitié du test d’existence. Comparer le nom seul ne suffirait pas : deux fichiers homonymes d’extensions différentes doivent être distingués.</p>
+    </div></div>
+  </div>
+
+  <div class="gap"></div>
+
+  <!-- 7 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-gray">Y</div>
+          <div class="txt">Si <span class="tok">l’ensemble</span> des éléments suivants sont vrais</div>
+          <div class="close">✕</div>
+        </div>
+        <div class="body">
+          <div class="filterline">
+            <span class="tok"><span class="dot d-orange">≡</span>trimmedFilename</span>
+            <span class="tok">est</span>
+            <span class="tok"><span class="dot d-blue">▤</span>Inputfile ▸ Nom</span>
+          </div>
+          <div class="filterline">
+            <span class="tok"><span class="dot d-orange">≡</span>TrimmedExr</span>
+            <span class="tok">est</span>
+            <span class="tok"><span class="dot d-blue">▤</span>Inputfile ▸ Extension de fichier</span>
+          </div>
+          <div class="empty">branche vraie vide — le fichier est déjà présent, rien à faire</div>
+        </div>
+      </div>
+    </div>
+    <div class="right"><div class="note key">
+      <div class="tag key">7 · cœur de la logique</div>
+      <h4>Le fichier ouvert est-il bien celui demandé ?</h4>
+      <p>Deux égalités combinées en ET :</p>
+      <p><code>trimmedFilename == Inputfile.Nom</code><br><code>TrimmedExr == Inputfile.Extension</code></p>
+      <p><b style="color:#d8d8de">Pourquoi ça marche :</b> si le fichier existe, ces propriétés décrivent le fichier lui-même et les deux tests passent. S’il est absent, elles décrivent le dossier parent — dont le nom est <code>File Provider Storage</code> et l’extension vide — et les deux tests échouent.</p>
+      <p>Aucune constante en dur : le test se répare tout seul si le dossier cible change.</p>
+      <p><b style="color:#d8d8de">Branche vraie vide</b> et c’est voulu — le fichier est là, il n’y a rien à faire.</p>
+    </div></div>
+  </div>
+
+  <div class="gap"></div>
+
+  <!-- 8 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-gray">Y</div>
+          <div class="txt">Sinon</div>
+          <div class="close">✕</div>
+        </div>
+      </div>
+    </div>
+    <div class="right"><div class="note branch">
+      <div class="tag branch">8 · rattrapage</div>
+      <h4>Le fichier manque</h4>
+      <p>On entre dans la branche de récupération : chercher l’image dans la photothèque et la matérialiser sur disque.</p>
+    </div></div>
+  </div>
+
+  <div class="gap"></div>
+
+  <!-- 9 -->
+  <div class="step">
+    <div class="left indent">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-photo">✿</div>
+          <div class="txt">Rechercher <span class="tok">Photos</span> lorsque <span class="tok">l’ensemble</span> des éléments suivants sont vrais</div>
+          <div class="close">✕</div>
+        </div>
+        <div class="body">
+          <div class="filterline">
+            <span class="tok">Nom</span> <span class="tok">est</span>
+            <span class="tok"><span class="dot d-orange">≡</span>trimmedFilename</span>
+            <div class="circleminus">−</div>
+          </div>
+          <div class="filterline">
+            <span class="tok">Date de création</span> <span class="tok">est après</span>
+            <span class="tok">06/01/2026 23:30</span>
+            <div class="circleminus">−</div>
+          </div>
+          <div class="addfilter"><div class="circleplus">+</div>Ajouter un filtre</div>
+          <div class="optrow"><span>Trier par</span><span class="optval">Date de modification</span></div>
+          <div class="optrow"><span>Ordre</span><span class="optval">Ordre chronologique décroissant</span></div>
+          <div class="optrow"><span>Limite</span><div class="switch"></div></div>
+          <div class="optrow"><span>Obtenir 1 élément</span><div class="stepper"><span>−</span><span>+</span></div></div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-photo">✿</span>FoundPhotoRoll</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note branch">
+      <div class="tag branch">9</div>
+      <h4>Recherche dans la photothèque</h4>
+      <p><b style="color:#d8d8de">Filtre nom</b> — correspondance sur <code>trimmedFilename</code>, sans extension.</p>
+      <p><b style="color:#d8d8de">Filtre date</b> — borne volontaire, pour la performance : elle élague l’index PhotoKit au lieu de balayer toute la photothèque. Le prédicat est poussé côté système, d’où le gain.</p>
+      <p><b style="color:#d8d8de">Tri</b> — par date de modification décroissante, puis limite à 1. Sans tri, deux homonymes donneraient un résultat arbitraire ; ici on prend déterministiquement la version la plus récemment retouchée.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left indent"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 10 -->
+  <div class="step">
+    <div class="left indent">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-blue">▤</div>
+          <div class="txt">Enregistrer <span class="tok"><span class="dot d-photo">✿</span>FoundPhotoRoll</span> dans <span class="tok">Sur mon iPhone</span><span class="arrow">›</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">Demander où enregistrer : <span class="tok">non</span> &nbsp;&nbsp; Remplacer : <span class="tok">oui</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note branch">
+      <div class="tag branch">10</div>
+      <h4>Écriture sur disque</h4>
+      <p>Effet de bord pur : <code>FoundPhotoRoll</code> n’est plus jamais lu par la suite. Ce qui compte, c’est que le fichier existe désormais à l’emplacement attendu.</p>
+      <p><span class="k">Demander où enregistrer = non</span> et <span class="k">Remplacer = oui</span> rendent l’opération silencieuse et idempotente.</p>
+    </div></div>
+  </div>
+
+  <div class="gap"></div>
+
+  <!-- 11 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-gray">Y</div>
+          <div class="txt">Terminer si</div>
+          <div class="close">✕</div>
+        </div>
+      </div>
+    </div>
+    <div class="right"><div class="note key">
+      <div class="tag key">11 · convergence</div>
+      <h4>Les deux chemins se rejoignent</h4>
+      <p>Quelle que soit la branche empruntée, l’invariant est le même : <b style="color:#d8d8de">le fichier est présent dans File Provider Storage</b>. Soit il y était déjà, soit on vient de l’y écrire.</p>
+      <p>La suite peut donc construire le chemin sans aucune vérification supplémentaire.</p>
+    </div></div>
+  </div>
+
+  <div class="gap"></div>
+
+  <!-- 12 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-orange">▤</div>
+          <div class="txt">Obtenir <span class="tok">Valeur</span> pour <span class="tok">cmd</span> dans <span class="tok"><span class="dot d-orange">▤</span>JSON</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-orange">▤</span>CmdText</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">12</div>
+      <h4>La commande fournie par l’appelant</h4>
+      <p>Par exemple <code>python img2video_iphone.py --prompt '...'</code>. Le raccourci ne l’interprète pas, il lui accolera simplement le chemin de l’image.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 13 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-yellow">≡</div>
+          <div class="txt">Texte</div>
+          <div class="close">✕</div>
+        </div>
+        <div class="body">
+          <div class="mono"><span class="tok"><span class="dot d-orange">▤</span>CmdText</span> ~File\ Provider\ Storage/<span class="tok"><span class="dot d-orange">▤</span>filename</span></div>
+          <div style="height:30px"></div>
+        </div>
+        <div class="subtext muted">→ <span class="tok"><span class="dot d-yellow">≡</span>CMDfinal</span></div>
+      </div>
+    </div>
+    <div class="right"><div class="note warn">
+      <div class="tag warn">13</div>
+      <h4>Assemblage de la ligne de commande</h4>
+      <p><code>CmdText</code> + espace + chemin + <code>filename</code>, en une seule action.</p>
+      <p>Les espaces du chemin sont échappés par <code>\</code>. Les guillemets ne conviennent pas ici : a-Shell les traiterait littéralement, et ils empêcheraient l’expansion du <code>~</code>.</p>
+      <p><b style="color:#d8d8de">Limite connue :</b> <code>filename</code> n’est pas échappé. Un espace ou une apostrophe dans le nom casserait la commande — sans conséquence en pratique, les noms issus de la photothèque étant du type <code>IMG_1234.HEIC</code>.</p>
+    </div></div>
+  </div>
+
+  <div class="step"><div class="left"><div class="link"></div></div><div class="right"></div></div>
+
+  <!-- 14 -->
+  <div class="step">
+    <div class="left">
+      <div class="card">
+        <div class="head">
+          <div class="icon i-mini">▶</div>
+          <div class="txt">Exécuter dans a-Shell Mini<span class="arrow">›</span></div>
+          <div class="close">✕</div>
+        </div>
+        <div class="body">
+          <div class="cmdline">cd&nbsp;&nbsp;~File\ Provider\ Storage/</div>
+          <div class="cmdline"><span class="tok"><span class="dot d-yellow">≡</span>CMDfinal</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="right"><div class="note">
+      <div class="tag">14 · sortie</div>
+      <h4>Exécution</h4>
+      <p>Deux commandes successives. Le <code>cd</code> positionne le répertoire de travail — utile pour les fichiers produits en sortie — puis <code>CMDfinal</code> s’exécute.</p>
+      <p>Le chemin apparaît dans les deux, sans conflit : <code>~File\ Provider\ Storage/</code> est un alias qui résout toujours en absolu, le <code>cd</code> n’affecte donc pas la résolution de l’argument.</p>
+    </div></div>
+  </div>
+
+</div>
+
+<div class="band">
+  <h3>Résumé de la logique</h3>
+  <p><span class="k" style="color:#d8d8de">Invariant garanti à la sortie du conditionnel :</span> le fichier nommé <code>filename</code> existe dans File Provider Storage.</p>
+  <p><span class="k" style="color:#d8d8de">Comment il est établi :</span> on tente l’ouverture, on vérifie que ce qu’on a ouvert porte bien le nom et l’extension demandés, et si ce n’est pas le cas on va chercher l’image dans Photos pour l’écrire à cet emplacement.</p>
+  <p><span class="k" style="color:#d8d8de">Astuce centrale :</span> l’échec d’ouverture ne se détecte pas par une valeur vide mais par le fait qu’iOS renvoie alors les propriétés du dossier parent — d’où la comparaison nom + extension plutôt qu’un test de nullité.</p>
+</div>
+
+</body>
+</html>

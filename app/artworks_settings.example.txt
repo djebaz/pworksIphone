@@ -1,0 +1,107 @@
+
+# Edited: 05/08 | 21:50
+# ArtWorks.ai image-to-video settings for img2video_iphone.py
+# Format: one key=value entry per line.
+# Lines beginning with # and blank lines are ignored.
+
+# -----------------------------------------------------------------------------
+# Input, prompts, and output
+# -----------------------------------------------------------------------------
+# Your preferred default input. Leave blank to choose a file by number.
+photo=input.jpg
+
+# Default prompt source: one prompt per non-empty, non-comment line.
+# Prompt order is generation and assembly order. The path is relative to this
+# settings file. Leave blank to use inline prompt= lines or the interactive prompt.
+promptFile=prompts.txt
+
+# Optional inline prompts are appended after prompts from promptFile.
+# Repeat prompt= to append several. Normally keep them in prompts.txt instead.
+# prompt=Static camera, subtle natural movement.
+
+# Leave blank to save <photo-name>_video.mp4 beside the input.
+output=
+
+# -----------------------------------------------------------------------------
+# ArtWorks API generation payload
+# -----------------------------------------------------------------------------
+# Explicit model is required: wan-2.2 or ltx-2.3.
+# Your preferred fps=8 and numFrames=90 are valid for both; LTX is retained as
+# the explicit default rather than relying on the undocumented omitted-model path.
+model=ltx-2.3
+resolution=480p
+performance=quality
+fps=16
+numFrames=90
+seed=87
+
+# Replaces deprecated isFast=true. Priority 1 is the highest/faster queue.
+priority=1
+
+# Optional task tags. Repeat tag= for multiple values.
+tag=img2video-iphone
+
+# Your preferred generation switches.
+applyOptimizations=true
+applyInterpolation=false
+interpolationFps=24
+
+# WARNING: interpolation is accepted by the API but its exact output behavior is
+# still unverified. The script measures the downloaded MP4 with ffprobe.
+
+# Optional LoRA: exact server filename|weight, weight from -2 to 2.
+# Repeat lora= for multiple LoRAs.
+lora=
+
+# -----------------------------------------------------------------------------
+# Multi-prompt execution
+# -----------------------------------------------------------------------------
+# chain: each prompt starts from the preceding task's final frame.
+# parallel: every prompt starts independently from its source photo.
+generationMode=chain
+combineVideos=true
+
+# Used only in parallel mode. Your preferred maximum is 6.
+maxParallelTasks=6
+incrementSeedPerTask=true
+
+# auto creates one shared batch ID for multi-prompt runs; off omits it.
+batchId=auto
+
+# Experimental random-prompt mode using randomprompt.txt. 0 disables it.
+experimentalLoopCount=0
+
+# -----------------------------------------------------------------------------
+# Polling, recovery, and queue control
+# -----------------------------------------------------------------------------
+pollIntervalSeconds=5
+
+# Overall local monitoring timeout per remote task. 0 waits indefinitely.
+taskTimeoutSeconds=7200
+
+# Bounded retries for transient GET status failures. Task submissions are never
+# automatically retried because that could create duplicate billable tasks.
+pollRequestRetryLimit=3
+pollRequestRetryBackoffSeconds=2
+
+resumeInterruptedTasks=true
+stateFile=artworks_tasks.json
+suspensionWarningSeconds=15
+unknownStatusLimit=5
+cancelOnInterrupt=true
+
+# Optional promotion while pending. Disabled because priority is already 1.
+promotePriorityAfterSeconds=0
+promotePriorityTo=1
+
+# -----------------------------------------------------------------------------
+# Local file behavior
+# -----------------------------------------------------------------------------
+overwriteExisting=false
+validateLoras=true
+
+autoCropPhotos=true
+autoCropMaxDifference=0.2
+
+# When the input is a video, prepend it to the generated continuation.
+includeSourceVideo=true
