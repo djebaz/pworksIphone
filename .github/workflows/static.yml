@@ -1,4 +1,4 @@
-# VERSION$00082$ | Edited: 07/08 | TIME: 13:57
+# VERSION$00083$ | Edited: 07/08 | TIME: 13:57
 # Publishes main at the Pages root and every open PR under /preview/pr-<number>/.
 
 name: Deploy Img2Video to GitHub Pages
@@ -22,7 +22,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: ${{ github.event_name == 'push' && github.ref_name == 'agent/pr6-seed-command-preview-fixes' && 'source-patch' || 'pages' }}
   cancel-in-progress: true
 
 jobs:
@@ -48,12 +48,12 @@ jobs:
           text = path.read_text()
           text = text.replace(
               "<!-- VERSION$00072$ | Edited: 07/08 | TIME: 13:26 -->",
-              "<!-- VERSION$00083$ | Edited: 07/08 | TIME: 13:57 -->",
+              "<!-- VERSION$00084$ | Edited: 07/08 | TIME: 13:57 -->",
               1,
           )
           text = text.replace(
               '<span class="pill version">SAFARI UI · 00072</span>',
-              '<span class="pill version">SAFARI UI · 00083</span>',
+              '<span class="pill version">SAFARI UI · 00084</span>',
               1,
           )
           rule = "[hidden]{display:none!important}"
