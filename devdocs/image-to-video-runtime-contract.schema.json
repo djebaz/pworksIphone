@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pworksiphone:artworks:image-to-video-runtime-contract:1",
+  "title": "pworksIphone ArtWorks.ai Image-to-Video Derived Runtime Contract",
+  "description": "Project-derived production request contract for ArtWorks.ai PaaS v3 image-to-video tasks. This is not the provider OpenAPI document.",
+  "type": "object",
+  "required": [
+    "type",
+    "priority",
+    "payload"
+  ],
+  "properties": {
+    "type": {
+      "const": "image-to-video",
+      "description": "Documented task type for this operation."
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Documented queue priority. Lower values mean higher priority. The deprecated isFast field is intentionally excluded."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional documented task categorization tags."
+    },
+    "batchId": {
+      "type": "string",
+      "description": "Optional documented batch identifier."
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "image",
+        "prompt",
+        "model",
+        "fps",
+        "numFrames",
+        "resolution",
+        "performance",
+        "applyOptimizations",
+        "applyInterpolation",
+        "loras"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Production policy requires a real image reference. The provider schema documents Base64/data references or HTTPS URLs and marks the field required despite also marking it nullable."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Documented required generation prompt."
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "wan-2.2",
+            "ltx-2.3"
+          ],
+          "description": "Must be explicit. The project does not rely on the provider's documented default."
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 24,
+          "description": "Request FPS. Model-specific maxima are enforced by conditional rules below. Do not use this value as final encoded FPS."
+        },
+        "numFrames": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 361,
+          "description": "Requested frame count. Model-specific maxima are enforced by conditional rules below. Accepted counts may be normalized in completed media."
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "480p",
+            "720p",
+            "1080p"
+          ],
+          "description": "Only the currently documented and runtime-confirmed ArtWorks image-to-video resolutions."
+        },
+        "performance": {
+          "type": "string",
+          "enum": [
+            "speed",
+            "quality",
+            "express"
+          ],
+          "description": "Documented and runtime-confirmed performance enum. The project requires an explicit value."
+        },
+        "applyOptimizations": {
+          "type": "boolean",
+          "description": "Explicit project request switch. Runtime effect remains unmeasured."
+        },
+        "applyInterpolation": {
+          "type": "boolean",
+          "description": "Explicit project request switch. Runtime visual effect remains unresolved."
+        },
+        "interpolationFps": {
+          "type": "integer",
+          "enum": [
+            16,
+            24
+          ],
+          "description": "Confirmed executor-accepted values. Omit when applyInterpolation is false; when true, use 16 for Wan and 24 for LTX."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Documented signed 64-bit integer field. No provider minimum/maximum or reproducibility guarantee is asserted here."
+        },
+        "loras": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lora"
+          },
+          "description": "Documented LoRA list. Cross-model compatibility remains unresolved."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "model": {
+                "const": "wan-2.2"
+              }
+            },
+            "required": [
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "fps": {
+                "maximum": 16
+              },
+              "numFrames": {
+                "maximum": 160
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "model": {
+                "const": "ltx-2.3"
+              }
+            },
+            "required": [
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "fps": {
+                "maximum": 24
+              },
+              "numFrames": {
+                "maximum": 361
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "applyInterpolation": {
+                "const": false
+              }
+            },
+            "required": [
+              "applyInterpolation"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "not": {
+              "required": [
+                "interpolationFps"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "applyInterpolation": {
+                "const": true
+              },
+              "model": {
+                "const": "wan-2.2"
+              }
+            },
+            "required": [
+              "applyInterpolation",
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "interpolationFps"
+            ],
+            "properties": {
+              "interpolationFps": {
+                "const": 16
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "applyInterpolation": {
+                "const": true
+              },
+              "model": {
+                "const": "ltx-2.3"
+              }
+            },
+            "required": [
+              "applyInterpolation",
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "interpolationFps"
+            ],
+            "properties": {
+              "interpolationFps": {
+                "const": 24
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "lora": {
+      "type": "object",
+      "required": [
+        "modelName"
+      ],
+      "properties": {
+        "modelName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2,
+          "default": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-project-contract": {
+    "status": "derived",
+    "officialProviderSchema": false,
+    "taskType": "image-to-video",
+    "evidencePolicy": "Hard validation encodes documented provider constraints, confirmed runtime constraints, and explicit project safety policy. Inferred and user-reported behavior is intentionally not promoted into validation rules.",
+    "sources": [
+      "../AGENTS.md",
+      "api.md"
+    ]
+  }
+}
