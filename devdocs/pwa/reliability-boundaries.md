@@ -1,4 +1,4 @@
-<!-- VERSION$00001$ | Edited: 07/08 | TIME: 19:08 -->
+<!-- VERSION$00002$ | Edited: 07/08 | TIME: 19:29 -->
 # PWA Reliability Boundaries
 
 ## Purpose
@@ -7,12 +7,15 @@ Record the failure windows that remain even after adopting a recovery-first PWA 
 
 The core model remains valid: once ArtWorks has accepted a task, the remote job can continue while iOS suspends the PWA, and the client can later reconcile by task ID. The items below identify where that model still has structural risk or provider-dependent assumptions.
 
+The detailed ArtWorks provider-contract review is maintained in [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md).
+
 ## Evidence vocabulary
 
 - **Documented** — stated by authoritative platform/provider documentation.
 - **Confirmed** — reproduced by repository evidence or saved runtime output.
 - **Inferred** — architecture reasoning consistent with current evidence but not yet provider-confirmed.
-- **Unknown** — the current project and public research do not establish the capability.
+- **Unknown** — the current project and provider evidence do not establish the capability.
+- **Not documented** — absent from the current authenticated ArtWorks OpenAPI contract; this does not prove that no private/newer/undocumented capability exists.
 
 ## 1. Submission orphan window
 
@@ -46,15 +49,21 @@ Any one of the following can close or greatly reduce this structural hole:
 2. **Task discovery/listing** — authenticated listing/search can find tasks created in a narrow time window and correlate them with known request metadata.
 3. **Provider-side client correlation field with query support** — a client-generated identifier/tag can later be used to locate the task reliably.
 
-### Current ArtWorks status
+### Current ArtWorks documented status
 
-**Unknown.** Current repository evidence documents task creation returning an `id`, direct lookup by known task ID, cancellation, and priority changes. The current project contract does not establish an idempotency header/key, a unique client request field with deduplication semantics, or a task-list/search endpoint suitable for orphan recovery.
+The authenticated OpenAPI snapshot exposes `POST /api/v3/tasks` and returns an `id`, but does **not** document an idempotency header, a deduplicating client request ID, or retry-safe creation semantics.
 
-`batchId` and `tags` exist in the request contract, but current project evidence does not establish either as an idempotency mechanism or as a queryable recovery key. Do not silently repurpose them without provider evidence.
+The same OpenAPI exposes `GET /api/v3/tasks/{task}` but does **not** document `GET /api/v3/tasks` for task listing/search.
 
-Public web research performed on 2026-08-07 did not locate authoritative ArtWorks documentation establishing idempotent creation, task listing/search, or webhook registration. Absence from search results is not proof of non-existence.
+`tags` are documented as optional values for task "categorization and filtering" and are returned in task info, but no documented task-list/filter operation is exposed in the same contract. This makes tags promising correlation metadata but not a currently usable orphan-recovery mechanism.
 
-### Client-side mitigation even before provider support is known
+`batchId` is documented for shared queue-priority behavior inside a batch. No idempotency or discovery semantics are documented for it.
+
+**Status:** idempotency and task discovery are **not documented in the current authenticated contract**.
+
+Do not claim that ArtWorks lacks those capabilities entirely; the evidence only establishes that the current contract does not expose them.
+
+### Client-side mitigation
 
 Persist a local submission-intent record *before* issuing POST. At minimum record:
 
@@ -71,6 +80,17 @@ After the response arrives, atomically advance that record to `submitted` with t
 
 This does **not** solve the orphan window by itself. It makes the ambiguous state explicit and provides the correlation material needed if ArtWorks exposes discovery later.
 
+### Forward-compatible correlation tag
+
+Because tags are documented and returned with task info, the PWA may attach a unique non-secret correlation tag to each step, for example:
+
+```text
+img2video-pwa
+client-step:<uuid>
+```
+
+This does not currently make an orphan discoverable because the documented API lacks a task-list/filter operation. It is an **inferred forward-compatibility measure** that could become useful if provider-side tag discovery is exposed later.
+
 ### Required implementation rule
 
 Never automatically re-submit an ambiguous `submitting` record after restart unless the architecture has a provider-backed way to prove that the first submission did not create a task.
@@ -83,7 +103,7 @@ A blind retry can duplicate billable work.
 
 Foreground-only discovery is safe only if a completed result remains retrievable long enough for realistic user-return intervals.
 
-If `results.data.video.url` is a short-lived signed URL and the PWA is suspended for longer than the URL lifetime, a completed generation may become undiscoverable or require a provider endpoint that can issue a fresh URL.
+If `results.data.video.url` is a short-lived signed URL and the PWA is suspended for longer than the URL lifetime, a completed generation may become unavailable through the old URL or require a provider endpoint that can issue a fresh URL.
 
 The relevant contract is therefore not merely "does the task remain completed?" but:
 
@@ -96,7 +116,9 @@ completed task retention
 
 ### Current ArtWorks status
 
-**Unknown.** Current project evidence confirms where the completed video URL has been observed, but does not establish:
+**Confirmed:** the working integration has observed completed image-to-video output at `results.data.video.url`.
+
+**Unknown:** the current authenticated OpenAPI and saved project evidence do not establish:
 
 - whether that URL is signed;
 - its expiration time, if any;
@@ -104,7 +126,9 @@ completed task retention
 - how long completed task records remain queryable;
 - how long generated media remains retained by ArtWorks.
 
-Public web research performed on 2026-08-07 did not find authoritative ArtWorks TTL documentation.
+The available project/file evidence did not surface an actual saved completed result URL suitable for safe TTL analysis.
+
+Public research performed on 2026-08-07 did not find authoritative ArtWorks retention/TTL documentation.
 
 ### Architecture consequence
 
@@ -236,22 +260,44 @@ This architecture only works cleanly if ArtWorks can emit a callback/webhook or 
 
 If webhook registration requires exposing a reusable ArtWorks credential to the relay, the design no longer preserves the selected credential boundary.
 
-### Current ArtWorks status
+### Current ArtWorks documented status
 
-**Unknown.** No authoritative webhook/callback capability has been established by current project evidence or public research.
+The current authenticated OpenAPI does **not** document a task webhook/callback registration operation or callback field on task creation.
 
-This should remain an explicit capability question rather than being assumed absent.
+Public research also did not establish an authoritative ArtWorks webhook mechanism.
 
-## 7. Updated reliability model
+**Status: Not documented in the current contract.**
+
+This must not be broadened into a claim that no undocumented/newer provider feature exists.
+
+## 7. CORS is a separate viability gate
+
+Even if recovery semantics are correct, browser JavaScript cannot call ArtWorks directly unless the API permits the GitHub Pages origin through CORS.
+
+The authenticated OpenAPI does not specify runtime CORS policy. A non-billable preflight from the current research runtime could not reach the ArtWorks host because the research environment itself failed network/DNS resolution; that result says nothing about ArtWorks policy.
+
+**Status: Unknown.**
+
+The required validation is an actual `OPTIONS` preflight from the Pages origin, or an equivalent request carrying:
+
+```http
+Origin: https://djebaz.github.io
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: authorization,content-type
+```
+
+No generation task is needed to test this.
+
+## 8. Updated reliability model
 
 The pure-PWA architecture remains viable if the following provider properties are acceptable:
 
 ```text
-Task submission can be made orphan-safe enough
+browser CORS works
+AND
+submission can be made orphan-safe enough
 AND
 completed tasks/results remain recoverable long enough
-AND
-direct browser authentication/CORS works
 ```
 
 The runtime model is:
@@ -266,30 +312,37 @@ intent persisted
    -> download / chain-advance while active
 ```
 
-The two structurally provider-dependent gaps are:
+The two structurally provider-dependent recovery gaps are:
 
 1. **before task-ID persistence** — orphan prevention/discovery;
 2. **after remote completion but before local retrieval** — task/result retention and URL lifetime.
 
-Everything between those boundaries is largely solvable with durable client state and foreground reconciliation.
+CORS is the separate gate that decides whether the browser can execute the provider operations at all.
 
-## 8. Discovery checklist
+Everything between the two recovery boundaries is largely solvable with durable client state and foreground reconciliation.
+
+## 9. Discovery checklist
 
 Resolve these before implementation is considered reliability-complete:
 
 - [ ] Verify browser CORS/preflight for Basic `Authorization` and all required ArtWorks methods.
-- [ ] Determine whether task creation supports an idempotency key or unique client request ID.
-- [ ] Determine whether tasks can be listed/searched by time, tag, batch, or client correlation field.
-- [ ] Determine whether `batchId` or `tags` have any reliable query/discovery semantics; do not assume.
+- [x] Review the current authenticated OpenAPI for a documented idempotency mechanism: none is documented.
+- [x] Review the current authenticated OpenAPI for task listing/search: none is documented.
+- [x] Establish documented semantics of `batchId`: shared batch priority only; do not treat it as idempotency/discovery.
+- [x] Establish current documented `tags` semantics: categorization/filtering is stated, but no task-list/filter operation is exposed in the same contract.
+- [ ] Determine whether ArtWorks has a newer/private/support-documented idempotency or task-discovery capability outside the current OpenAPI.
 - [ ] Determine completed task retention duration.
 - [ ] Determine video URL lifetime and whether task re-fetch refreshes expired result URLs.
-- [ ] Determine whether ArtWorks exposes webhook/callback registration and what authentication model it uses.
+- [x] Review the current authenticated OpenAPI for webhook/callback registration: none is documented.
+- [ ] Determine whether ArtWorks has a newer/private/support-documented webhook/callback mechanism outside the current OpenAPI.
 - [ ] On target iPhone, verify Home Screen IndexedDB persistence and `navigator.storage.persisted()` behavior across relaunch/reboot.
 - [ ] Verify Password AutoFill in installed Home Screen mode.
 - [ ] Verify automatic result export/download after long suspension intervals.
 
 ## Sources reviewed
 
+Provider findings were cross-checked against the authenticated `openapi3-live.json` snapshot captured on 2026-08-05, the current project API report, and the production Python client.
+
 Platform storage findings were cross-checked against current WebKit Storage Policy documentation, WebKit's Home Screen ITP carve-out documentation, and MDN Storage API documentation on 2026-08-07.
 
-ArtWorks-specific idempotency, listing, result TTL, and webhook capabilities remain provider questions. Current project evidence and public search did not establish them.
+Public web search did not expose authoritative ArtWorks documentation that extends the authenticated contract for CORS, idempotency, task listing, result TTL, or webhooks.
