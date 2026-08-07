@@ -1,4 +1,4 @@
-<!-- VERSION$00001$ | Edited: 07/08 | TIME: 18:20 -->
+<!-- VERSION$00002$ | Edited: 07/08 | TIME: 18:24 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -17,7 +17,8 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 
 ## Documents
 
-- [`discovery.md`](discovery.md) — current findings, user decisions, verified repository constraints, and unresolved questions.
+- [`decision-log.md`](decision-log.md) — explicit decisions and open choices from the discovery sessions.
+- [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
 - [`security-and-api-architecture.md`](security-and-api-architecture.md) — credential handling and browser/API architecture options.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
