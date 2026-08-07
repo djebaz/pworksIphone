@@ -1,11 +1,11 @@
-# VERSION$00083$ | Edited: 07/08 | TIME: 13:57
+# VERSION$00085$ | Edited: 07/08 | TIME: 13:57
 # Publishes main at the Pages root and every open PR under /preview/pr-<number>/.
 
 name: Deploy Img2Video to GitHub Pages
 
 on:
   push:
-    branches: ["main", "agent/pr6-seed-command-preview-fixes"]
+    branches: ["main"]
     paths:
       - "shortcuts/img2video/**"
       - ".github/workflows/static.yml"
@@ -22,54 +22,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.event_name == 'push' && github.ref_name == 'agent/pr6-seed-command-preview-fixes' && 'source-patch' || 'pages' }}
+  group: "pages"
   cancel-in-progress: true
 
 jobs:
-  patch-source:
-    if: github.event_name == 'push' && github.ref_name == 'agent/pr6-seed-command-preview-fixes'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v6
-        with:
-          ref: agent/pr6-seed-command-preview-fixes
-
-      - name: Fix hidden conditional controls
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("shortcuts/img2video/index.html")
-          text = path.read_text()
-          text = text.replace(
-              "<!-- VERSION$00072$ | Edited: 07/08 | TIME: 13:26 -->",
-              "<!-- VERSION$00084$ | Edited: 07/08 | TIME: 13:57 -->",
-              1,
-          )
-          text = text.replace(
-              '<span class="pill version">SAFARI UI · 00072</span>',
-              '<span class="pill version">SAFARI UI · 00084</span>',
-              1,
-          )
-          rule = "[hidden]{display:none!important}"
-          if rule not in text:
-              text = text.replace("*{box-sizing:border-box}\n", "*{box-sizing:border-box}\n" + rule + "\n", 1)
-          path.write_text(text)
-          PY
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add shortcuts/img2video/index.html
-          git diff --cached --quiet || git commit -m "Fix hidden conditional controls in Safari UI"
-          git push
-
   build:
-    if: github.event_name != 'push' || github.ref_name == 'main'
     runs-on: ubuntu-latest
 
     steps:
@@ -152,7 +109,6 @@ jobs:
           path: "./site"
 
   deploy:
-    if: github.event_name != 'push' || github.ref_name == 'main'
     needs: build
 
     runs-on: ubuntu-latest
