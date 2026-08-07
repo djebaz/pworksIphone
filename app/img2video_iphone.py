@@ -1,4 +1,4 @@
-# VERSION$00052$ | Edited: 07/08 | TIME: 08:21
+# VERSION$00054$ | Edited: 07/08 | TIME: 08:38
 """Generate a video from a local image with the ArtWorks API.
 
 Designed for a-Shell Mini on iPhone. Uses only Python's standard library.
@@ -1505,7 +1505,8 @@ def parse_args():
     parser.add_argument(
         "--interpolation", action=argparse.BooleanOptionalAction,
         default=parse_bool(settings.get("applyInterpolation", "false"), "applyInterpolation"),
-        help="enable interpolation (applyInterpolation); runtime effect remains unverified",
+        help="enable interpolation (applyInterpolation), independently of --interpolate; "
+             "runtime effect remains unverified",
     )
     parser.add_argument(
         # Deliberately type=str with no choices: the settings-sourced default
@@ -1513,13 +1514,17 @@ def parse_args():
         # applies both to a string default), because an inactive interpolation
         # preference must not abort argument parsing. validate_interpolation_fps
         # runs explicitly below once whether interpolation is active is known.
+        #
+        # --interpolate controls interpolationFps only. It never enables or
+        # disables interpolation itself; that is --interpolation/--no-interpolation's
+        # job alone, so the two flags compose independently in any order.
         "--interpolate", dest="interpolation_fps", type=str,
         default=interpolation_fps_configured, metavar="FPS",
         help=(
-            "interpolation target FPS; documented enum 24, 25, 30, 50, 60 (default "
-            "24). Also enables interpolation when supplied, even together with "
-            "--no-interpolation. Runtime support within this enum has conflicting "
-            "path-specific evidence (see AGENTS.md)."
+            "interpolation target FPS only; documented enum 24, 25, 30, 50, 60 "
+            "(default 24). Does not enable interpolation by itself -- combine with "
+            "--interpolation to actually apply it. Runtime support within this "
+            "enum has conflicting path-specific evidence (see AGENTS.md)."
         ),
     )
     parser.add_argument(
@@ -1689,8 +1694,10 @@ def parse_args():
     args = parser.parse_args()
     configure_color(args.color)
 
-    if any(value == "--interpolate" or value.startswith("--interpolate=") for value in sys.argv):
-        args.interpolation = True
+    # applyInterpolation (--interpolation/--no-interpolation) and interpolationFps
+    # (--interpolate) are deliberately independent: --interpolate only ever sets
+    # the target value below, never the enabled/disabled switch, regardless of
+    # argument order or what else is on the command line.
 
     priority_was_explicit = any(
         value == "--priority" or value.startswith("--priority=") for value in sys.argv
@@ -1719,10 +1726,9 @@ def parse_args():
             "promotePriorityTo must be numerically lower (higher priority) than priority"
         )
     if args.interpolation:
-        # args.interpolation is already True here whenever --interpolate was
-        # given explicitly (forced above), so this covers both "interpolation
-        # enabled" and "an explicit target was requested". Only now is the
-        # value actually going to reach the API, so only now is it validated.
+        # applyInterpolation (--interpolation/--no-interpolation) is the only
+        # thing that decides whether interpolationFps is about to reach the
+        # API, so it is the only thing this branch is conditioned on.
         args.interpolation_fps = validate_interpolation_fps(args.interpolation_fps)
         # args.fps is the generation request FPS, not the native/output FPS that
         # interpolation would actually act on, so it cannot be used to predict
