@@ -1,4 +1,4 @@
-<!-- VERSION$00010$ | Edited: 07/08 | TIME: 19:51 -->
+<!-- VERSION$00011$ | Edited: 07/08 | TIME: 20:08 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -19,162 +19,249 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 
 - [`decision-log.md`](decision-log.md) — explicit decisions and open choices from the discovery sessions.
 - [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
+- [`runtime-architecture.md`](runtime-architecture.md) — consolidated reconciler-led production architecture: credential layer, durable Run/Step/Task ledger, serialized creation, orphan handling, staging/export, Chain, provider surface assumptions, and implementation stages.
 - [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local/user-owned credential model, Password AutoFill preference, threat model, CSP direction, and browser/API constraints.
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
 - [`external-research-review.md`](external-research-review.md) — review of the user-supplied August 2026 iOS PWA background-execution research, including Declarative Web Push, Safari 26 installability, Wake Lock, foreground checkpoints, server-vs-device tradeoffs, and the resulting Img2Video recommendations.
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
 - [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay option.
 - [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
-- [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain strategy, now preferring Mediabunny for remote MP4 reading and presentation-order final-frame decoding, with MP4Box.js + direct WebCodecs retained as a lower-level fallback.
-- [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
+- [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain strategy, preferring Mediabunny for remote MP4 reading and presentation-order final-frame decoding, with MP4Box.js + direct WebCodecs retained as a lower-level fallback.
+- [`orion-ios-extension-findings.md`](orion-ios-extension-findings.md) — direct inspection of two supplied Orion extension packages and the distinction between HTMLVideoElement control, privileged extension downloads, and PWA sample-level media access.
+- [`implementation-plan.md`](implementation-plan.md) — current staged plan: non-billable viability gates, single prompt, serialized-submit parallel mode, Chain, and the conditions under which a relay/server decision could be reopened.
 
 ## Current direction
 
-The target is an installable PWA hosted by GitHub Pages under a dedicated path, preserving the existing UI and file-picker behavior as much as practical while moving ArtWorks task submission and monitoring into the PWA itself.
+The target is an installable PWA hosted through a trusted HTTPS origin, preserving the existing UI/file-picker behavior as much as practical while moving ArtWorks task orchestration into the PWA itself.
 
 Future PWA runtime source belongs in repository-root `pwa/`; the existing Safari/Shortcut/Python implementation remains untouched during discovery and early PWA development.
 
-The application does not need functional offline generation because ArtWorks requires network access. It should still show clear network/offline state and preserve all remote task IDs so interrupted work can be reconciled when connectivity/application execution returns.
+The application does not need functional offline generation because ArtWorks requires network access. It must preserve durable local execution state so work can be reconciled when connectivity/application execution returns.
+
+## Runtime architecture
+
+The central architectural decision is now explicit:
+
+> **The reconciler is the center, not the poll loop.**
+
+IndexedDB is the durable `Run -> Step -> Task` ledger. The foreground poll loop is only a responsiveness optimization.
+
+For every potentially billable creation:
+
+```text
+persist local intent
+    -> serialized POST /api/v3/tasks
+    -> receive remote task ID
+    -> immediately bind ID to the same ledger record
+    -> foreground poll while active
+    -> reconcile by known ID after visible/reopen/online
+```
+
+If a POST may have been accepted but no remote ID was durably captured, mark the local record ambiguous and never silently resubmit it.
+
+Logical parallel mode serializes creation POSTs so only one task at a time can occupy that ambiguity window. Once IDs are durably known, remote execution, polling and output handling can proceed concurrently with bounded concurrency.
+
+All retry/backoff/timeout/priority calculations derive from persisted wall-clock timestamps rather than JavaScript timer ticks.
+
+The authenticated OpenAPI task-info schema includes `preparing` and `unknown` in addition to the shorter lifecycle summary in AGENTS.md. They must not be treated as terminal merely because the shorter list omits them; `unknown` receives bounded defensive handling while preserving the task ID.
 
 ## Python/PWA runtime relationship
 
-The current parity analysis finds that most of the Python client's **orchestration logic** can be reproduced directly in a PWA:
+The PWA can reproduce most of the Python client's orchestration logic, but the browser lifecycle is different.
 
-- request validation;
-- task submission;
-- immediate task-ID persistence;
-- status polling and bounded retries;
-- terminal-state/error handling;
-- parallel execution;
-- cancellation and priority operations;
-- detailed task/run history;
-- per-phase timing;
-- download state;
-- prompt-set reuse;
-- interruption recovery without duplicate submissions.
+The Python/a-Shell process attempts to remain active, while a PWA assumes suspension is normal. Remote ArtWorks work continues independently. On return, the PWA loads durable state and reconciles known IDs against the authoritative provider state.
 
-The largest difference is lifecycle, not API capability.
+The deliberate long-term boundary is:
 
-The Python/a-Shell process attempts to keep polling continuously, while the PWA must assume iOS can suspend it outside the foreground. The remote ArtWorks task continues independently. When the PWA becomes active again it loads IndexedDB, queries existing task IDs, and resumes from the authoritative remote state.
+### PWA
 
-In that sense, the Python client's recovery model becomes the PWA's normal execution model.
+- production user interface;
+- credential unlock/use in memory;
+- durable ledger and reconciliation;
+- submission/polling/cancel/priority controls;
+- run history;
+- normal output staging/export;
+- Chain final-frame extraction.
 
-Chain mode no longer has an FFmpeg dependency in the selected design. The preferred implementation candidate is Mediabunny: its `UrlSource` can read remote MP4 data efficiently, `InputVideoTrack.canDecode()` checks the actual browser codec capability, and `VideoSampleSink.getSample(Infinity)` directly retrieves the last decoded frame in presentation order. That frame can be exported through canvas as the next transition image. MP4Box.js + direct WebCodecs remains the lower-level fallback/debug path. The Chain design does not require `VideoEncoder`, audio processing, muxing, or ffmpeg.wasm.
+### Python + project probes
 
-The PWA intentionally does not reproduce shell execution or FFmpeg video concatenation; every ArtWorks output remains independent.
+- provider discovery;
+- reproducible API experiments;
+- `ffprobe`-grade media measurement;
+- exact codec/container diagnostics;
+- saved measurement evidence.
 
-The current background-execution recommendation is foreground-first orchestration with durable IndexedDB recovery. A Service Worker must not be treated as a persistent poller. It becomes useful when a concrete event-driven feature such as Web Push is implemented.
+The PWA is therefore not a wholesale replacement for the diagnostic runtime even though it becomes the production interaction surface.
 
-The August 2026 external research review reinforces that Background Sync, Periodic Background Sync, keep-alive timers, WebSockets, audio tricks, and Wake Lock do not provide dependable iOS background execution. Wake Lock may still be useful as an optional foreground UX feature. Classic Web Push can briefly wake a Service Worker but requires a visible notification; Declarative Web Push is preferable for pure notifications because it deliberately avoids JavaScript execution.
+## Chain/media direction
 
-Modern iOS Home Screen web apps can receive Web Push, but a server-side push sender and a meaningful external completion event are required.
+Chain no longer has an FFmpeg dependency in the selected design.
+
+Preferred production candidate:
+
+```text
+ArtWorks result URL
+    -> Mediabunny UrlSource
+    -> Input({ formats: [MP4] })
+    -> primary video track
+    -> track.canDecode()
+    -> VideoSampleSink.getSample(Infinity)
+    -> final presentation-order VideoSample
+    -> canvas
+    -> JPEG/PNG Blob
+    -> persist transition state
+    -> next asynchronous ArtWorks task
+```
+
+The supplied Mediabunny guide documents lazy partial reads, MP4-specific tree shaking, optimized `UrlSource` reads with bounded cache, runtime decodability checks, presentation-order sample sinks, direct last-sample retrieval, and explicit resource cleanup.
+
+Project-specific constraints:
+
+- do not use `ALL_FORMATS` in production Chain code;
+- override `UrlSource`'s default infinite retry with bounded retry behavior;
+- close samples/dispose inputs promptly;
+- vendor a pinned reviewed build under the repository-controlled PWA;
+- do not load credential-adjacent runtime JavaScript from a third-party CDN.
+
+MP4Box.js + direct WebCodecs remains the low-level fallback/debug path. `<video>` + canvas remains the simplest compatibility experiment.
+
+No video encoder, audio processing, output muxer, or ffmpeg.wasm is required for normal Chain advancement.
+
+## Orion iOS extension findings
+
+Two supplied Orion packages were inspected directly.
+
+### RedGifs Downloader for Orion 1.1.7
+
+The extension uses explicit RedGifs host permissions plus the browser extension `downloads` permission. Its content script resolves a direct MP4 URL and its background service worker delegates that URL to `downloads.download()`.
+
+It does **not** parse, decode, transcode, or transform the MP4 in JavaScript.
+
+This demonstrates extension privilege, not normal PWA capability. It does not prove that an ArtWorks result URL is JavaScript-fetchable from GitHub Pages or that a Home Screen PWA has the extension downloads API.
+
+### Orion Lite AutoNext 0.2.19
+
+The extension has only storage permission and controls the site's existing `HTMLVideoElement`: play/pause, current time, playback rate, sizing, muted state, inline-playback hints and normal media lifecycle events.
+
+The browser owns network, demux, decode, rendering and audio. The content script does no media-byte processing.
+
+The practical lesson is to keep ordinary playback/preview browser-native and bring media bytes into JavaScript only where sample-level access is genuinely required, chiefly Chain final-frame extraction.
 
 ## ArtWorks provider capability status
 
 The authenticated ArtWorks OpenAPI snapshot currently available to the project narrows several provider questions:
 
-- **CORS/preflight:** still **Unknown**; OpenAPI does not define runtime CORS policy and the current research runtime could not reach the host to perform a meaningful preflight.
-- **Task-creation idempotency:** **Not documented**; no `Idempotency-Key`, deduplicating client request ID, or retry-safe creation semantics are exposed.
+- **CORS/preflight:** still **Unknown**; OpenAPI does not define runtime CORS policy.
+- **Task-creation idempotency:** **Not documented**; no duplicate-safe creation contract is exposed.
 - **Task listing/search:** **Not documented**; `/api/v3/tasks` exposes POST, while task retrieval is documented only by known ID at `/api/v3/tasks/{task}`.
-- **Tags:** documented for "categorization and filtering" and returned in task info, but no task-list/filter operation is exposed in the same contract.
-- **`batchId`:** documented for shared queue-priority behavior, not for idempotency or orphan discovery.
-- **Completed-task/media retention and result URL refresh:** still **Unknown**; no TTL/retention contract or saved real result URL suitable for expiry analysis was found.
-- **Webhook/callback registration:** **Not documented** in the current authenticated contract.
+- **Tags:** documented for categorization/filtering and returned with task info, but no list/filter operation is exposed in the same contract.
+- **`batchId`:** documented for shared queue-priority behavior, not orphan recovery.
+- **Completed-task/media retention and result URL refresh:** **Unknown**.
+- **Webhook/callback registration:** **Not documented**.
+- **`run-ffmpeg`:** present in the authenticated generic task-type enum, but payload schema, account entitlement, URL-to-URL semantics and billing are not established by current project evidence.
 
-"Not documented" is deliberately narrower than "does not exist". A newer/private/provider-support capability could still close the orphan or notification gaps and should be verified before concluding otherwise.
+"Not documented" is deliberately narrower than "does not exist". The production architecture simply does not depend on those capabilities.
 
 ## Reliability boundaries
 
-Foreground recovery solves interruptions only after a remote task ID has been durably captured. The PWA therefore treats two provider-dependent boundaries as first-class discovery blockers:
+Foreground recovery solves interruptions only after a remote task ID has been durably captured.
 
-1. **submission orphan window** — ArtWorks may accept a POST before the PWA persists the returned task ID; safe recovery requires provider idempotency or a reliable task-discovery/correlation mechanism;
-2. **post-completion retrieval window** — result recovery depends on completed-task retention, video URL lifetime, and the ability to refresh/retrieve a result after a long suspension.
+The two structural provider-dependent boundaries remain:
 
-A local submission-intent record should be persisted before POST, but that record alone cannot prove whether an ambiguous request created a billable task. Blind automatic re-submission of an ambiguous intent is therefore prohibited until provider behavior closes that gap.
+1. **submission orphan window** — provider may accept creation before local ID persistence;
+2. **post-completion retrieval window** — result recovery depends on task/media retention and URL refresh behavior.
 
-Because ArtWorks tags are documented and returned with task info, a unique non-secret correlation tag per PWA step is a reasonable forward-compatible design option. It does not solve orphan recovery under the current documented API because no task-list/filter endpoint is exposed.
+A local UUID/intent record is mandatory but cannot prove whether an ambiguous POST created billable work. An optional deterministic ArtWorks tag is useful forward-compatible correlation evidence, not a current discovery mechanism.
 
-Retry schedules, phase timers, priority-promotion thresholds, and timeouts must be reconstructed from persisted wall-clock timestamps after suspension rather than resumed from JavaScript tick counters.
+Do not send an undocumented `Idempotency-Key` by default; it has no current provider contract and would also change CORS preflight requirements.
 
-A narrow future relay remains possible without moving reusable ArtWorks credentials off-device: if ArtWorks can emit authenticated completion callbacks, a relay could map opaque task/correlation IDs to Web Push subscriptions and only notify the device. Webhook/callback registration is not documented in the current provider contract.
+## Background execution and relay status
+
+Foreground-first orchestration with durable IndexedDB recovery remains the portable baseline.
+
+A Service Worker must not be treated as a persistent poller. Background Sync, Periodic Background Sync, keep-alive timers, sockets, looping audio and Wake Lock do not provide dependable unattended execution on iOS. Wake Lock remains an attended-mode enhancement only.
+
+A credential-free push relay has been removed from the active implementation stages because webhook/callback registration is not documented in the current provider contract. A relay that polls ArtWorks would require the reusable credential and violate the selected device-owned boundary.
+
+Revisit the relay only if a provider-side trusted completion event becomes available.
 
 ## Credentials
 
 **Selected direction:** each user supplies their own ArtWorks credentials; reusable credentials are never injected into GitHub Pages assets or committed to the repository.
 
-**Preferred persistence approach:** use Safari/system Password AutoFill through a semantic username/password form, then keep the active credential in application memory while the PWA is unlocked. This delegates persistent credential storage to the user's password manager rather than creating an application-owned plaintext secret database.
+**Preferred persistence approach:** use Safari/system Password AutoFill through semantic username/current-password fields, then keep the active credential only in memory while the PWA is unlocked.
 
-If the requirement is literally one physical device with no password-manager synchronization, the user's system Passwords/iCloud sync policy matters and must be treated separately from PWA storage policy.
+A known task with locked credentials is an authentication-required state, not a failed/missing task.
 
-Raw `localStorage` is rejected for ArtWorks credentials. Encrypted IndexedDB + Web Crypto with an explicit unlock secret is a fallback to investigate only if real-device Password AutoFill testing is insufficient.
+Raw `localStorage` is rejected for ArtWorks credentials. Encrypted IndexedDB + Web Crypto remains a fallback only if real-device Password AutoFill testing is insufficient.
 
 Direct browser-to-ArtWorks requests remain contingent on verified CORS/preflight support.
 
-## Recovery and history
+## Storage and outputs
 
-The PWA is intended to persist enough non-secret state to recover active and historical work safely:
+Use IndexedDB for the structured task/run/history ledger.
 
-- configuration and prompt sets;
-- remote ArtWorks task IDs;
-- chain/parallel progress;
-- last known task state and phase timestamps;
-- completed/pending download state;
-- reusable run history.
+On launch, check `navigator.storage.persisted()` and call `navigator.storage.persist()` only when not already persistent.
 
-Use IndexedDB as the structured task/run/history store.
+OPFS is a browser-supported candidate for origin-private media staging, not a user-visible Files location. Treat output states separately:
 
-After interruption, the PWA should re-query existing non-terminal task IDs rather than creating duplicate potentially billable tasks. If credentials are locked after a cold restart, persisted tasks remain visible and can show an authentication-required state until the user uses Password AutoFill or enters the credential again.
+```text
+remote-completed -> staged -> exported
+```
 
-Per-step timers are derived from persisted timestamps. They must not rely on browser timers continuing while iOS has suspended the PWA.
+Prefer streaming/bounded-memory staging. User-visible Files/Photos/share behavior remains a physical-iPhone validation item.
 
-For storage durability, check `navigator.storage.persisted()` on launch and call `navigator.storage.persist()` only when the origin is not already persistent. WebKit documents persistent mode as remembered across sessions. Home Screen first-party storage is also explicitly exempt from ITP's historic seven-day script-writable-storage deletion rule. Storage loss must nevertheless remain a handled recovery path.
+## Deployment security direction
 
-## Outputs and chain behavior
-
-Each completed ArtWorks output is an independent file; the PWA will not reproduce Python FFmpeg concatenation.
-
-Automatic output export/download remains a foreground/browser capability that needs physical-device testing on iOS. Durable export state should allow retry after interruption.
-
-Chain mode still needs the previous output's final displayed frame. Mediabunny is now the preferred implementation candidate because its media sinks provide decoded samples in presentation order and explicitly support retrieving the last sample with `getSample(Infinity)`. Its remote `UrlSource` also provides optimized network reading, reducing the need for application-owned MP4 range parsing. Result-media CORS/partial-read behavior and real-device Safari decoding still require validation.
-
-Mediabunny also exposes useful codec, dimensions, duration and packet statistics, but Python plus `ffprobe`/project probes remains the authoritative deep media measurement and provider-discovery environment. The PWA is the production surface, not a wholesale replacement for the diagnostic runtime.
-
-For security, any selected Mediabunny build should be pinned and served locally from the repository-controlled PWA rather than loaded from a third-party CDN at runtime.
-
-## Deployment direction
-
-The PWA should be published separately from the working launcher. The preferred layout being studied is:
+The previously preferred path layout remains mechanically useful:
 
 ```text
 Production:  /pwa/
 PR preview:  /preview/pr-<number>/pwa/
 ```
 
-Manifest, icon, and Service Worker paths should be relative so the same source works in production and preview directories without allowing a preview Service Worker to control production.
+However, path separation is **not** origin isolation.
 
-## Standalone presentation and installation
+Before any real ArtWorks credential is used, decide whether PR/fork preview content is fully trusted. If untrusted code can be published beneath the same credential-bearing origin, the production PWA needs a separate trusted origin/hostname or the preview model must change.
 
-The desired iOS standalone appearance should blend into the application's existing dark background and safe-area design.
+Relative manifest/icon/Service Worker paths/scopes remain required, but Service Worker scope does not solve same-origin credential/storage trust.
 
-No custom installation banner is planned initially; use normal browser/OS installation flows.
+## Implementation stages
 
-The final application icon is being prepared separately, so no temporary icon should be introduced.
+The active plan is now:
 
-Safari/WebKit 26 no longer requires a manifest or Service Worker merely for Home Screen web-app installation. Img2Video should still ship a manifest because it provides stable application identity, icons, theme, display mode, start URL, scope, and cross-browser PWA semantics.
+1. **Stage 0 — non-billable viability gates:** API CORS, result-media JavaScript access, origin trust, local Mediabunny fixture.
+2. **Stage 1 — single prompt:** credential flow, ledger, reconciler, one serialized async creation, polling, staging/export.
+3. **Stage 2 — multi-prompt/parallel:** serialized creation, bounded concurrent known-ID work, durable partial completion.
+4. **Stage 3 — Chain:** Mediabunny final-frame extraction and persisted dependent-step advancement.
+
+No active server/relay stage exists under the current provider contract.
+
+Video concatenation/assembly remains intentionally out of scope by product decision.
+
+## Remaining highest-value unknowns
+
+- ArtWorks API CORS from the real intended production origin;
+- ArtWorks result-media CORS/partial reads;
+- completed-task/result TTL and URL refresh behavior;
+- target-iPhone Password AutoFill behavior;
+- target-iPhone installed-PWA export behavior;
+- real Wan/LTX MP4 decode/final-frame extraction through Mediabunny;
+- `run-ffmpeg` entitlement/payload/cost only if future server-side transforms are considered.
 
 ## Research discipline
 
-Platform/provider claims in these documents should distinguish documented browser behavior from project observations and architecture inference.
+Platform/provider claims in these documents must distinguish documented behavior from project observations, user-selected decisions and architecture inference.
 
-Unknowns must remain explicit. In particular, do not assume:
+Do not assume:
 
 - ArtWorks permits browser CORS until verified;
-- ArtWorks has or lacks a webhook beyond what the current authenticated contract documents;
-- ArtWorks supports task-creation idempotency or task listing/search beyond what the current authenticated contract documents;
-- completed ArtWorks task/result URLs remain retrievable for any particular duration until verified;
-- a Service Worker continues running after the app is backgrounded;
-- automatic iOS downloads behave like desktop Chrome;
+- undocumented provider capabilities are available;
+- result URLs remain retrievable for a particular duration until verified;
+- extension host/download privileges apply to PWAs;
+- Service Workers continue running after backgrounding;
+- automatic iOS export behaves like desktop Chrome;
 - Password AutoFill behaves identically in every installed-PWA context until device-tested;
 - browser credential encryption eliminates XSS risk.
 
-No discovery-only API test should create a potentially billable task merely to answer a platform question that can be resolved by documentation, preflight, or a rejected validation request.
+No discovery-only API test should create a potentially billable task merely to answer a question that can be resolved by documentation, preflight, a local fixture, or an already-paid task/result.
