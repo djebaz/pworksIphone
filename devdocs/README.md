@@ -1,4 +1,4 @@
-<!-- VERSION$00078$ | Edited: 07/08 | TIME: 13:26 -->
+<!-- VERSION$00089$ | Edited: 07/08 | TIME: 14:24 -->
 # Developer Documentation
 
 `devdocs/` contains the durable technical documentation and reference material for pworksIphone. Runtime code and reusable tools live elsewhere in the repository.
@@ -51,7 +51,7 @@ Because the contract is strict JSON, it intentionally has no line-1 VERSION comm
 
 Four documents cover the Safari-facing UI at `shortcuts/img2video/index.html` and its multi-prompt/execution capabilities:
 
-- [`img2video-safari-ux-spec.md`](img2video-safari-ux-spec.md) is the canonical UX spec: section order, exact controls, visibility rules, Seed/Randomize behavior, collapsed Command Preview, and mobile UX principles.
+- [`img2video-safari-ux-spec.md`](img2video-safari-ux-spec.md) is the canonical UX spec: section order, exact controls, visibility rules, Seed / No CLI seed behavior, collapsed Command Preview, and mobile UX principles.
 - [`img2video-presets-settings-contract.md`](img2video-presets-settings-contract.md) explains the three configuration layers — `presets.txt`, `settings.txt` import, and `localStorage` working state — and exactly which fields each one may touch.
 - [`img2video-execution-model.md`](img2video-execution-model.md) explains how live UI state becomes the CLI command handed to `app/img2video_iphone.py`, including multi-prompt encoding, Seed, chain/parallel mode, `--sound`, and output-path precedence.
 - [`img2video-safari-checklist.md`](img2video-safari-checklist.md) tracks acceptance criteria for the multi-prompt work and the subsequent corrective UX pass.
