@@ -1,4 +1,4 @@
-<!-- VERSION$00068$ | Edited: 07/08 | TIME: 10:43 -->
+<!-- VERSION$00074$ | Edited: 07/08 | TIME: 13:26 -->
 # Img2Video Execution Model — UI State → CLI
 
 This document explains how the Safari UI's live form state becomes the exact command line handed to `app/img2video_iphone.py`, and from there to the Shortcut.
@@ -8,13 +8,13 @@ This document explains how the Safari UI's live form state becomes the exact com
 The UI keeps one in-memory state object (`state()` in `index.html`), rebuilt from the DOM on every input/change event:
 
 ```text
-imagePath, prompts[], model, resolution, performance, fps, frames, priority,
+imagePath, prompts[], model, resolution, performance, fps, frames, seed, priority,
 optimizations, interpolation, interpolationFps,
 generationMode, combineVideos, maxParallelTasks,
 playOnFinish
 ```
 
-`prompts` is an ordered array of strings — the ordered prompt list from the Motion section, sanitized (newlines collapsed to spaces, trimmed) at read time. Everything else is a single scalar sourced from the matching form control.
+`prompts` is an ordered array of strings — the ordered prompt list from the Motion section, sanitized (newlines collapsed to spaces, trimmed) at read time. `seed` is stored as text so the UI can preserve the full signed 64-bit integer range without JavaScript `Number` precision loss. Everything else is a single scalar sourced from the matching form control.
 
 ## CLI generation
 
@@ -22,17 +22,30 @@ playOnFinish
 
 1. `python <script path>`
 2. One `--prompt '<text>'` per entry in `prompts`, in list order
-3. `--model`, `--resolution`, `--performance`, `--fps`, `--frames`, `--priority`
-4. `--optimizations`/`--no-optimizations`, `--interpolation`/`--no-interpolation`
-5. `--interpolate <target>` — only when `interpolation` is true
-6. `--mode`, `--combine-videos`/`--no-combine-videos`, `--max-parallel-tasks` — only when `prompts.length > 1` (and `--max-parallel-tasks` only when `generationMode === "parallel"`)
-7. `--sound` — only when `playOnFinish` is true
+3. `--model`, `--resolution`, `--performance`, `--fps`, `--frames`
+4. `--seed <integer>` only when Seed is non-empty
+5. `--priority`
+6. `--optimizations`/`--no-optimizations`, `--interpolation`/`--no-interpolation`
+7. `--interpolate <target>` — only when `interpolation` is true
+8. `--mode`, `--combine-videos`/`--no-combine-videos`, `--max-parallel-tasks` — only when `prompts.length > 1` (and `--max-parallel-tasks` only when `generationMode === "parallel"`)
+9. `--sound` — only when `playOnFinish` is true **and** the current run has one unambiguous final result to play
 
-The **Command Preview** panel renders the same argument groups one per line for readability, but that formatting is display-only. The value actually copied by "Copy command" and actually sent to the Shortcut (as the `cmd` field of the launch payload) is always the single space-joined line — no literal newlines are ever placed inside the executed command, so what a-Shell runs is identical either way.
+The **Command Preview** starts collapsed. Tapping its header expands the generated command plus Copy and Reset actions. The display wraps argument groups with shell continuation markers (`\`) so press-and-hold copying remains executable even if the Clipboard API is unavailable. `Copy command` and the Shortcut hand-off still use the canonical single space-joined command with no display line breaks.
+
+## Seed
+
+Seed is an optional signed 64-bit integer accepted by the Python client through `--seed`.
+
+- Blank Seed means the UI omits `--seed` and leaves seed selection to the Python/settings path.
+- Entered values are validated against `-9223372036854775808` through `9223372036854775807` before Copy or Launch.
+- The UI keeps Seed as a string and validates with `BigInt`, avoiding precision loss above JavaScript's safe-integer range.
+- **Randomize** uses `crypto.getRandomValues()` to produce a signed 64-bit value, with a small integer fallback only if Web Crypto is unavailable.
+
+Seed is persisted in the working UI state and may be imported from `settings.txt`, but it is intentionally not part of the compact `presets.txt` schema or preset matching. See `img2video-presets-settings-contract.md`.
 
 ## Prompt list encoding
 
-Each prompt becomes its own `--prompt` argument, shell-quoted with the existing `quote()` helper (POSIX single-quote escaping). This matches `img2video_iphone.py`'s `--prompt` argument, which uses `action="append"` — the Python client already supports and expects repeated `--prompt` flags, and treats their order as both task order and, in chain/combine mode, assembly order (`app/img2video_iphone.py`, prompt-order docstring around the multi-prompt argument group). The UI does not invent this behavior; it exposes a capability the client already had.
+Each prompt becomes its own `--prompt` argument, shell-quoted with the existing `quote()` helper (POSIX single-quote escaping). This matches `img2video_iphone.py`'s `--prompt` argument, which uses `action="append"` — the Python client already supports and expects repeated `--prompt` flags, and treats their order as both task order and, in chain/combine mode, assembly order.
 
 ## Chain mode
 
@@ -54,13 +67,21 @@ Each prompt becomes its own `--prompt` argument, shell-quoted with the existing 
 
 ## Execution-only settings
 
-One field never influences the generation request payload sent to ArtWorks.ai — it only affects how the local run behaves:
+Execution deliberately contains one control only:
 
-- **Play result when finished** → `--sound` (the client's actual flag, also spelled `-s`; there is no `--open-video` flag). Plays the completed video locally after a successful generation run.
+- **Play result when finished** → `--sound` (the client's actual flag, also spelled `-s`). There is no `--open-video` flag.
 
-It is excluded from `presets.txt` and from "Import settings.txt" — see `img2video-presets-settings-contract.md` for why.
+For a multi-prompt Parallel run with **Combine videos OFF**, the Python client finishes with several independent output files and has no single result to select for playback. In that state the UI disables Play result when finished and omits `--sound`. The checked preference is preserved so it becomes effective again if the run returns to a configuration with a single playable result.
 
-There is intentionally no output-directory control. `--output` is always omitted, so `img2video_iphone.py` falls back to its own default of `<photo-name>_video.mp4` saved beside the source image. An earlier draft of this UI added an output-directory text field, but iOS Safari has no API that can turn a folder picker into a real filesystem path (no File System Access API, no working `webkitdirectory`), so a manually-typed path would have looked like a picker without behaving like one — see the ux-spec doc's Execution controls section.
+There is intentionally no output-directory picker or output-folder text field.
+
+The Safari UI always omits an explicit `--output` argument. That does **not** necessarily mean the Python client always uses `<photo-name>_video.mp4`: `argparse` first takes `output=` from the real `artworks_settings.txt` when one is configured, and only falls back to `<photo-name>_video.mp4` beside the input when neither CLI nor settings provides an output path. The effective precedence is therefore:
+
+```text
+explicit --output CLI
+    > artworks_settings.txt output=
+    > <photo-name>_video.mp4 beside the input
+```
 
 ## Shortcut hand-off
 
@@ -70,4 +91,4 @@ The final payload sent via `shortcuts://run-shortcut?...&text=<payload>` is:
 {"version": 1, "filename": "<basename only>", "cmd": "<single-line command from above>"}
 ```
 
-The Shortcut (`Run Img2Video in a-Shell`, reconstructed in `devdocs/shortcut/README.md`) resolves `filename` to a real file in Files/Photos, changes into the a-Shell "File Provider Storage" directory, appends the resolved path to `cmd`, and runs the result as one a-Shell command. Nothing in the Shortcut depends on a fixed output path, so making `--output` optional in the UI does not change anything on the Shortcut side.
+The Shortcut (`Run Img2Video in a-Shell`, reconstructed in `devdocs/shortcut/README.md`) resolves `filename` to a real file in Files/Photos, changes into the a-Shell "File Provider Storage" directory, appends the resolved path to `cmd`, and runs the result as one a-Shell command.
