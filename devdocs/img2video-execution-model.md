@@ -1,4 +1,4 @@
-<!-- VERSION$00074$ | Edited: 07/08 | TIME: 13:26 -->
+<!-- VERSION$00091$ | Edited: 07/08 | TIME: 14:24 -->
 # Img2Video Execution Model — UI State → CLI
 
 This document explains how the Safari UI's live form state becomes the exact command line handed to `app/img2video_iphone.py`, and from there to the Shortcut.
@@ -8,13 +8,13 @@ This document explains how the Safari UI's live form state becomes the exact com
 The UI keeps one in-memory state object (`state()` in `index.html`), rebuilt from the DOM on every input/change event:
 
 ```text
-imagePath, prompts[], model, resolution, performance, fps, frames, seed, priority,
+imagePath, prompts[], model, resolution, performance, fps, frames, seed, seedDisabled, priority,
 optimizations, interpolation, interpolationFps,
 generationMode, combineVideos, maxParallelTasks,
 playOnFinish
 ```
 
-`prompts` is an ordered array of strings — the ordered prompt list from the Motion section, sanitized (newlines collapsed to spaces, trimmed) at read time. `seed` is stored as text so the UI can preserve the full signed 64-bit integer range without JavaScript `Number` precision loss. Everything else is a single scalar sourced from the matching form control.
+`prompts` is an ordered array of strings — the ordered prompt list from the Motion section, sanitized (newlines collapsed to spaces, trimmed) at read time. `seed` is stored as text so the UI can preserve the full signed 64-bit integer range without JavaScript `Number` precision loss. `seedDisabled` is a boolean UI-state flag that records whether Safari should omit an explicit `--seed`. Everything else is a single scalar sourced from the matching form control.
 
 ## CLI generation
 
@@ -23,25 +23,32 @@ playOnFinish
 1. `python <script path>`
 2. One `--prompt '<text>'` per entry in `prompts`, in list order
 3. `--model`, `--resolution`, `--performance`, `--fps`, `--frames`
-4. `--seed <integer>` only when Seed is non-empty
+4. `--seed <integer>` only when `seedDisabled === false` and Seed contains a valid value
 5. `--priority`
 6. `--optimizations`/`--no-optimizations`, `--interpolation`/`--no-interpolation`
 7. `--interpolate <target>` — only when `interpolation` is true
 8. `--mode`, `--combine-videos`/`--no-combine-videos`, `--max-parallel-tasks` — only when `prompts.length > 1` (and `--max-parallel-tasks` only when `generationMode === "parallel"`)
 9. `--sound` — only when `playOnFinish` is true **and** the current run has one unambiguous final result to play
 
+When `seedDisabled === true`, Safari omits `--seed` regardless of the stored Seed value.
+
 The **Command Preview** starts collapsed. Tapping its header expands the generated command plus Copy and Reset actions. The display wraps argument groups with shell continuation markers (`\`) so press-and-hold copying remains executable even if the Clipboard API is unavailable. `Copy command` and the Shortcut hand-off still use the canonical single space-joined command with no display line breaks.
 
 ## Seed
 
-Seed is an optional signed 64-bit integer accepted by the Python client through `--seed`.
+Seed is an explicit signed 64-bit integer accepted by the Python client through `--seed`, with an independent Safari opt-out state.
 
-- Blank Seed means the UI omits `--seed` and leaves seed selection to the Python/settings path.
-- Entered values are validated against `-9223372036854775808` through `9223372036854775807` before Copy or Launch.
-- The UI keeps Seed as a string and validates with `BigInt`, avoiding precision loss above JavaScript's safe-integer range.
-- **Randomize** uses `crypto.getRandomValues()` to produce a signed 64-bit value, with a small integer fallback only if Web Crypto is unavailable.
+- Default Seed is `42`.
+- Default `seedDisabled` is `false`, so the default Safari command emits `--seed 42`.
+- `seed` is stored as text and validated against `-9223372036854775808` through `9223372036854775807`, avoiding JavaScript safe-integer precision loss.
+- `seedDisabled` is a boolean working-state flag.
+- The **No CLI seed** control sets `seedDisabled=true`, disables the Seed input, retains the stored Seed value, and suppresses `--seed` in the generated command.
+- Returning to explicit Seed sets `seedDisabled=false`; the retained Seed value becomes active again.
+- Copy and Launch validate Seed only when `seedDisabled=false`.
+- A non-empty valid `seed=` imported from `settings.txt` loads that value and enables explicit Seed.
+- An empty `seed=` imported from `settings.txt` selects `No CLI seed`.
 
-Seed is persisted in the working UI state and may be imported from `settings.txt`, but it is intentionally not part of the compact `presets.txt` schema or preset matching. See `img2video-presets-settings-contract.md`.
+Both `seed` and `seedDisabled` are persisted in the local working state. Seed remains intentionally outside the compact `presets.txt` schema and preset matching. See `img2video-presets-settings-contract.md`.
 
 ## Prompt list encoding
 
