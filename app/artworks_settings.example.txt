@@ -1,5 +1,4 @@
-
-# Edited: 05/08 | 21:50
+# VERSION$00049$ | Edited: 07/08 | TIME: 07:21
 # ArtWorks.ai image-to-video settings for img2video_iphone.py
 # Format: one key=value entry per line.
 # Lines beginning with # and blank lines are ignored.
@@ -41,13 +40,18 @@ priority=1
 # Optional task tags. Repeat tag= for multiple values.
 tag=img2video-iphone
 
-# Your preferred generation switches.
+# Generation-processing switches are booleans.
 applyOptimizations=true
 applyInterpolation=false
+
+# interpolationFps is a separate interpolation target, not the native/output FPS.
+# Authenticated OpenAPI: integer, default 24, enum 24/25/30/50/60.
+# Historical runtime evidence for 30 is conflicting across executor paths, so do
+# not infer a universal 16/24 interpolation rule from native Wan/LTX output FPS.
 interpolationFps=24
 
-# WARNING: interpolation is accepted by the API but its exact output behavior is
-# still unverified. The script measures the downloaded MP4 with ffprobe.
+# The script measures downloaded MP4 metadata with ffprobe because request FPS,
+# native/output FPS, and interpolation target FPS are separate concepts.
 
 # Optional LoRA: exact server filename|weight, weight from -2 to 2.
 # Repeat lora= for multiple LoRAs.
