@@ -1,4 +1,4 @@
-<!-- VERSION$00076$ | Edited: 07/08 | TIME: 13:26 -->
+<!-- VERSION$00090$ | Edited: 07/08 | TIME: 14:24 -->
 # Img2Video Safari UX Spec
 
 Canonical UX specification for `shortcuts/img2video/index.html`, the Safari-facing launcher that hands a `{filename, cmd}` payload to the `Run Img2Video in a-Shell` Shortcut.
@@ -27,8 +27,9 @@ Sections remain in this fixed order:
 - The preset dropdown is populated from `presets.txt`, fetched at load time.
 - Selecting a preset applies only the existing nine compact preset fields: `model`, `resolution`, `performance`, `fps`, `frames`, `priority`, `optimizations`, `interpolation`, `interpolationFps`.
 - Seed is not part of the compact preset schema or preset matching. It is a separate per-run Generation value.
-- "Custom" is a derived label, not a stored preset. There is no create/save/rename/delete preset UI.
-- "Import settings.txt" may also import `seed`, but still does not import prompts, source selection, generation mode, combine-videos, max-parallel-tasks, playback preference, or output paths.
+- `Custom` is a derived display label only. It appears when no loaded preset exactly matches the current compact preset fields, but it is not a selectable dropdown item.
+- There is no create/save/rename/delete preset UI.
+- `Import settings.txt` may also import `seed`, but still does not import prompts, source selection, generation mode, combine-videos, max-parallel-tasks, playback preference, or output paths.
 
 ## Source behavior
 
@@ -82,12 +83,17 @@ FPS/frame limits remain model-specific and use the existing range/number control
 
 ### Seed
 
-- Seed is optional; blank means no explicit `--seed` is emitted.
-- It uses the same compact control sizing and typography as the existing Generation inputs.
-- A clearly labeled **Randomize** action sits beside it.
-- Entered values must fit the Python client's signed 64-bit range.
-- Randomize generates a signed 64-bit value using Web Crypto when available.
-- Seed is persisted in local working state and may be imported from `settings.txt`.
+- Default Seed value is `42`.
+- Explicit Seed is enabled by default.
+- The Seed value is stored as text so the UI can preserve the Python client's full signed 64-bit integer range without JavaScript `Number` precision loss.
+- When explicit Seed is enabled, the value must be a valid signed 64-bit integer and Safari emits `--seed <value>`.
+- **No CLI seed** is the explicit opt-out control.
+- When `No CLI seed` is active:
+  - the Seed input is disabled/grayed while retaining its stored value;
+  - Safari emits no `--seed` argument.
+- Seed value and enabled/disabled state are both persisted in local working state as `seed` and `seedDisabled`.
+- A valid non-empty `seed=` imported from `settings.txt` enables explicit Seed and loads that value.
+- An empty `seed=` imported from `settings.txt` selects `No CLI seed` while preserving the current stored Seed value for later re-enabling.
 - Seed is not added to `presets.txt` and does not change which preset is considered active.
 
 ## Processing controls
@@ -131,7 +137,9 @@ Submitting validates:
 
 - filename exists;
 - every prompt is non-empty;
-- Seed is blank or a valid signed 64-bit integer.
+- when `No CLI seed` is OFF, Seed is a valid signed 64-bit integer.
+
+If `No CLI seed` is ON, Seed validation is skipped for Copy/Launch and no `--seed` argument is emitted.
 
 It then navigates to `shortcuts://run-shortcut?...` with `{version, filename, cmd}`.
 
@@ -150,11 +158,11 @@ Command Preview body is hidden until expanded.
 
 ## Reset behavior
 
-Reset clears the current working-state key plus known legacy keys, restores defaults (including blank Seed and one default prompt), and re-fetches `presets.txt`. Reset does not require a page reload.
+Reset clears the current working-state key plus known legacy keys, restores defaults (including `seed=42`, explicit Seed enabled, and one default prompt), and re-fetches `presets.txt`. Reset does not require a page reload.
 
 ## Mobile UX principles
 
 - Keep the existing single-column `main{width:min(760px,100%)}` iPhone-first layout and safe-area padding.
 - Keep existing synthwave colors, cards, borders, typography, spacing, and control sizing.
 - Keep Launch Shortcut fixed at the bottom with the READY/status pill.
-- New Seed/Randomize and Command Preview interactions must reuse existing control primitives rather than trigger a global CSS resizing pass.
+- Seed / No CLI seed and Command Preview interactions must reuse existing control primitives rather than trigger a global CSS resizing pass.
