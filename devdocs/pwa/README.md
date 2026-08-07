@@ -1,4 +1,4 @@
-<!-- VERSION$00006$ | Edited: 07/08 | TIME: 19:04 -->
+<!-- VERSION$00007$ | Edited: 07/08 | TIME: 19:08 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -23,6 +23,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
 - [`external-research-review.md`](external-research-review.md) — review of the user-supplied August 2026 iOS PWA background-execution research, including Declarative Web Push, Safari 26 installability, Wake Lock, foreground checkpoints, server-vs-device tradeoffs, and the resulting Img2Video recommendations.
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
+- [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, and the narrow webhook-to-push relay option.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
 ## Current direction
@@ -66,6 +67,19 @@ The August 2026 external research review reinforces that Background Sync, Period
 
 Modern iOS Home Screen web apps can receive Web Push, but a server-side push sender and a meaningful external completion event are required. ArtWorks webhook/callback availability is currently unknown.
 
+## Reliability boundaries
+
+Foreground recovery solves interruptions only after a remote task ID has been durably captured. The PWA therefore treats two provider-dependent boundaries as first-class discovery blockers:
+
+1. **submission orphan window** — ArtWorks may accept a POST before the PWA persists the returned task ID; safe recovery requires provider idempotency or a reliable task-discovery/correlation mechanism;
+2. **post-completion retrieval window** — result recovery depends on completed-task retention, video URL lifetime, and the ability to refresh/retrieve a result after a long suspension.
+
+A local submission-intent record should be persisted before POST, but that record alone cannot prove whether an ambiguous request created a billable task. Blind automatic re-submission of an ambiguous intent is therefore prohibited until provider behavior closes that gap.
+
+Retry schedules, phase timers, priority-promotion thresholds, and timeouts must be reconstructed from persisted wall-clock timestamps after suspension rather than resumed from JavaScript tick counters.
+
+A narrow future relay remains possible without moving reusable ArtWorks credentials off-device: if ArtWorks can emit authenticated completion callbacks, a relay could map opaque task/correlation IDs to Web Push subscriptions and only notify the device. Webhook/callback availability remains unknown.
+
 ## Credentials
 
 **Selected direction:** each user supplies their own ArtWorks credentials; reusable credentials are never injected into GitHub Pages assets or committed to the repository.
@@ -94,6 +108,8 @@ Use IndexedDB as the structured task/run/history store.
 After interruption, the PWA should re-query existing non-terminal task IDs rather than creating duplicate potentially billable tasks. If credentials are locked after a cold restart, persisted tasks remain visible and can show an authentication-required state until the user uses Password AutoFill or enters the credential again.
 
 Per-step timers are derived from persisted timestamps. They must not rely on browser timers continuing while iOS has suspended the PWA.
+
+For storage durability, check `navigator.storage.persisted()` on launch and call `navigator.storage.persist()` only when the origin is not already persistent. WebKit documents persistent mode as remembered across sessions. Home Screen first-party storage is also explicitly exempt from ITP's historic seven-day script-writable-storage deletion rule. Storage loss must nevertheless remain a handled recovery path.
 
 ## Outputs and chain behavior
 
@@ -132,6 +148,8 @@ Unknowns must remain explicit. In particular, do not assume:
 
 - ArtWorks permits browser CORS until verified;
 - ArtWorks has or lacks a webhook until authoritative evidence is found;
+- ArtWorks supports task-creation idempotency or task listing/search until verified;
+- completed ArtWorks task/result URLs remain retrievable for any particular duration until verified;
 - a Service Worker continues running after the app is backgrounded;
 - automatic iOS downloads behave like desktop Chrome;
 - Password AutoFill behaves identically in every installed-PWA context until device-tested;
