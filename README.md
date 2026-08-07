@@ -1,4 +1,4 @@
-<!-- VERSION$00032$ | Edited: 07/08 | TIME: 04:47 -->
+<!-- VERSION$00039$ | Edited: 07/08 | TIME: 05:57 -->
 # pworksIphone
 
 Image-to-video workflow designed for iPhone, a-Shell Mini, iOS Shortcuts, and the ArtWorks.ai API.
@@ -15,7 +15,10 @@ pworksIphone/
 │
 ├── app/
 │   ├── img2video_iphone.py
-│   └── artworks_settings.example.txt
+│   ├── artworks_credentials.example.txt
+│   ├── artworks_settings.example.txt
+│   ├── prompts.example.txt
+│   └── randomprompt.example.txt
 │
 ├── shortcuts/
 │   └── img2video/
@@ -44,6 +47,7 @@ pworksIphone/
     │   ├── annotated-en.html
     │   └── annotated-fr.html
     └── references/
+        ├── export-public-shortcut-as-json.md
         └── styles.css
 ```
 
@@ -51,7 +55,7 @@ pworksIphone/
 
 ### `app/`
 
-Production Python runtime for image-to-video generation on iPhone. `img2video_iphone.py` is the main application script. The tracked settings file is an example; personal credentials, mutable settings, prompts, recovery state, and generated media should remain local.
+Production Python runtime for image-to-video generation on iPhone. `img2video_iphone.py` is the main application script. The tracked settings, credentials, and prompt files are examples only; real credentials, mutable settings, personal prompts, recovery state, and generated media should remain local.
 
 ### `shortcuts/`
 
@@ -62,7 +66,7 @@ Runtime components directly involved in the iOS Shortcut workflow.
 
 ### `tools/`
 
-Reusable development utilities. `tools/shortcuts/dlshort.py` is the utility used to download and extract unsigned iCloud Shortcut data. ArtWorks API discovery and timing probes live under `tools/probes/`.
+Reusable development utilities. `tools/shortcuts/dlshort.py` is the project utility used to download and extract unsigned iCloud Shortcut data. ArtWorks API discovery and timing probes live under `tools/probes/`.
 
 Some probe commands may create real ArtWorks tasks and may therefore be billable. Read their help and `AGENTS.md` before running them.
 
@@ -74,6 +78,16 @@ Non-production implementations and prototypes. Experimental behavior should be m
 
 Developer documentation and reference material. `devdocs/shortcut/` contains reconstruction and reference documentation for the Shortcut workflow, not the installable Shortcut itself — the installable artifact lives at `shortcuts/img2video/dist/`. See [`devdocs/README.md`](devdocs/README.md) for the full documentation map.
 
+## Local setup
+
+The production client looks for its local configuration files beside `app/img2video_iphone.py`.
+
+1. Copy `app/artworks_credentials.example.txt` to `app/artworks_credentials.txt`, then fill in your own ArtWorks username and password locally.
+2. Copy `app/artworks_settings.example.txt` to `app/artworks_settings.txt` when you want a local editable settings file.
+3. Copy `app/prompts.example.txt` to `app/prompts.txt` and/or `app/randomprompt.example.txt` to `app/randomprompt.txt` when you want file-based prompts. Edit those local copies as needed.
+
+The real `artworks_credentials.txt`, personal prompt files, mutable settings, runtime/recovery state, logs, generated media, and temporary files are intentionally untracked. Never commit real credential values.
+
 ## Agent instructions
 
 Read [`AGENTS.md`](AGENTS.md) before modifying code that creates, validates, polls, cancels, downloads, or analyzes ArtWorks.ai image-to-video tasks.
@@ -82,4 +96,4 @@ The project distinguishes API behavior as **Documented**, **Confirmed**, **Infer
 
 ## Local files and secrets
 
-Do not commit credentials, mutable runtime state, personal prompt/configuration files, logs, generated media, or temporary outputs. The repository `.gitignore` contains the standard exclusions for this workflow.
+Do not commit credentials, mutable runtime state, personal prompt/configuration files, logs, generated media, or temporary outputs. The repository `.gitignore` contains the standard exclusions for this workflow while explicitly allowing the tracked `.example.txt` templates.
