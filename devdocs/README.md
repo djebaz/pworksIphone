@@ -1,4 +1,4 @@
-<!-- VERSION$00040$ | Edited: 07/08 | TIME: 05:57 -->
+<!-- VERSION$00044$ | Edited: 07/08 | TIME: 06:54 -->
 # Developer Documentation
 
 `devdocs/` contains the durable technical documentation and reference material for pworksIphone. Runtime code and reusable tools live elsewhere in the repository.
@@ -9,6 +9,8 @@
 devdocs/
 ├── README.md
 ├── api.md
+├── derived-runtime-contract.md
+├── image-to-video-runtime-contract.schema.json
 ├── shortcut/
 │   ├── README.md
 │   ├── annotated-en.html
@@ -28,6 +30,16 @@ API findings must retain their evidence level:
 - **Confirmed** — observed in an API response or measured from completed output media.
 - **Inferred** — consistent with current evidence but not exhaustively verified.
 - **User-reported** — manually observed but not yet reproduced by saved automated evidence.
+
+## Derived runtime contract
+
+[`image-to-video-runtime-contract.schema.json`](image-to-video-runtime-contract.schema.json) is the machine-readable JSON Schema used to express the project's derived production request contract for ArtWorks.ai `image-to-video` tasks.
+
+[`derived-runtime-contract.md`](derived-runtime-contract.md) explains why that contract is separate from the provider OpenAPI document, which evidence levels may become hard validation rules, how known Swagger/runtime mismatches are represented, and how the derived contract should be refreshed.
+
+The derived schema is **not** an official ArtWorks OpenAPI document and must not be edited or described as though it were one. It is intentionally stricter where confirmed runtime behavior or explicit project safety rules require client-side validation.
+
+Because the contract is strict JSON, it intentionally has no line-1 VERSION comment; adding one would invalidate JSON.
 
 ## `shortcut/`
 
