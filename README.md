@@ -1,9 +1,9 @@
-<!-- VERSION$00078$ | Edited: 07/08 | TIME: 13:38 -->
+<!-- VERSION$00088$ | Edited: 07/08 | TIME: 14:24 -->
 # pworksIphone
 
 Image-to-video workflow designed for iPhone, a-Shell Mini, iOS Shortcuts, and the ArtWorks.ai API.
 
-The repository separates production runtime files, Shortcut-facing UI, reusable development tools, experiments, and developer documentation. The Safari launcher now provides the primary iPhone control surface for built-in presets, settings import, ordered multi-prompt execution, Chain/Parallel generation, interpolation controls, Seed/Randomize, local playback, and the Shortcut hand-off.
+The repository separates production runtime files, Shortcut-facing UI, reusable development tools, experiments, and developer documentation. The Safari launcher now provides the primary iPhone control surface for built-in presets, settings import, ordered multi-prompt execution, Chain/Parallel generation, interpolation controls, explicit Seed / No CLI seed control, local playback, and the Shortcut hand-off.
 
 ## Repository structure
 
@@ -73,7 +73,7 @@ Production Python runtime for image-to-video generation on iPhone. `img2video_ip
 
 Runtime components directly involved in the iOS Shortcut workflow.
 
-- `shortcuts/img2video/index.html` is the Safari launcher/UI. It manages the current run configuration, builds the functional command, sends the `{filename, cmd}` payload, and launches `Run Img2Video in a-Shell`. The current UI includes the built-in preset picker, one-off `settings.txt` import, ordered multi-prompt controls, Chain/Parallel execution, generation and interpolation controls, Seed/Randomize, optional local playback through `--sound`, and a collapsed Command Preview.
+- `shortcuts/img2video/index.html` is the Safari launcher/UI. It manages the current run configuration, builds the functional command, sends the `{filename, cmd}` payload, and launches `Run Img2Video in a-Shell`. The current UI includes the built-in preset picker, one-off `settings.txt` import, ordered multi-prompt controls, Chain/Parallel execution, generation and interpolation controls, explicit Seed / No CLI seed control, optional local playback through `--sound`, and a collapsed Command Preview.
 - `shortcuts/img2video/presets.txt` is the read-only built-in preset library fetched by the Safari UI at runtime. It is the editable, version-controlled source of truth for predefined generation/processing presets; the UI does not create, save, rename, or delete presets.
 - `shortcuts/img2video/dist/` contains the signed, installable Shortcut artifact (`Run_Img2Video_in_a-Shell.shortcut`) that users import into the iOS Shortcuts app. This binary is not modified by hand; it is exported/signed from the Shortcuts app itself.
 
