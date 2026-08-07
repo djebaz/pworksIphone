@@ -1,4 +1,4 @@
-<!-- VERSION$00077$ | Edited: 07/08 | TIME: 13:26 -->
+<!-- VERSION$00093$ | Edited: 07/08 | TIME: 14:24 -->
 # Img2Video Safari UX — Acceptance Checklist
 
 Tracks the shipped multi-prompt/execution work from PR #5 plus the corrective UX pass in PR #6.
@@ -15,17 +15,18 @@ Tracks the shipped multi-prompt/execution work from PR #5 plus the corrective UX
 | 8 | Interpolation target enabled only when interpolation is ON | Done |
 | 9 | Execution contains only Play result when finished | Done — real flag is `--sound`; no output-directory UI |
 | 10 | Parallel + Combine OFF does not emit an unusable `--sound` | Done — playback control disabled, preference retained |
-| 11 | Generation includes optional Seed | Done — signed 64-bit validation, `--seed` only when non-empty |
-| 12 | Seed has a clear Randomize action | Done — Web Crypto signed 64-bit generation with fallback |
-| 13 | Compact `presets.txt` schema remains unchanged | Done — Seed is deliberately not preset-scoped |
-| 14 | Settings import recognizes Seed | Done — invalid/out-of-range seed is skipped |
-| 15 | Command Preview starts collapsed | Done — header toggles body; state not persisted |
-| 16 | Expanded Command Preview shows command, Copy, Reset | Done |
-| 17 | Manual preview copy remains shell-safe | Done — display lines use shell continuation markers |
-| 18 | Copy/Launch still use one canonical single-line command | Done |
-| 19 | `--output` precedence is documented correctly | Done — CLI > settings `output=` > `<photo>_video.mp4` fallback |
-| 20 | Sticky Launch Shortcut footer and READY/status indicator remain unchanged | Done |
-| 21 | Reset clears working + legacy keys and reloads `presets.txt` | Done |
+| 11 | Generation includes explicit signed-64-bit Seed | Done — default Seed is `42`; value stored as text and validated when active |
+| 12 | Seed can be disabled explicitly | Done — `No CLI seed` disables the field and suppresses `--seed` |
+| 13 | Compact `presets.txt` schema remains unchanged | Done — Seed and `seedDisabled` are deliberately not preset-scoped |
+| 14 | Settings import recognizes Seed | Done — non-empty valid `seed=` enables explicit Seed; empty `seed=` selects `No CLI seed`; invalid/out-of-range values are skipped |
+| 15 | `Custom` is derived only | Done — shown when no preset matches; not a selectable preset-menu item |
+| 16 | Command Preview starts collapsed | Done — header toggles body; state not persisted |
+| 17 | Expanded Command Preview shows command, Copy, Reset | Done |
+| 18 | Manual preview copy remains shell-safe | Done — display lines use shell continuation markers |
+| 19 | Copy/Launch still use one canonical single-line command | Done |
+| 20 | `--output` precedence is documented correctly | Done — CLI > settings `output=` > `<photo>_video.mp4` fallback |
+| 21 | Sticky Launch Shortcut footer and READY/status indicator remain unchanged | Done |
+| 22 | Reset clears working + legacy keys and reloads `presets.txt` | Done — restores `seed=42` with explicit Seed enabled |
 
 ## Compatibility notes
 
@@ -33,3 +34,5 @@ Tracks the shipped multi-prompt/execution work from PR #5 plus the corrective UX
 - The Safari UI intentionally has no output-directory picker or output-folder text field.
 - Max Parallel Tasks defaults to 6 in the UI, matching the tracked example settings file.
 - Seed is represented as text in the browser so values across the full signed 64-bit range are not rounded through JavaScript `Number`.
+- `seedDisabled` is working-state only; presets neither store nor match it.
+- `Custom` is a derived display label, not a preset that can be selected.
