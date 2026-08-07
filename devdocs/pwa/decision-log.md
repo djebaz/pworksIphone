@@ -1,4 +1,4 @@
-<!-- VERSION$00002$ | Edited: 07/08 | TIME: 18:43 -->
+<!-- VERSION$00003$ | Edited: 07/08 | TIME: 19:08 -->
 # PWA Discovery Decision Log
 
 This file records explicit decisions and open choices from the PWA discovery session so later implementation work does not silently reinterpret them.
@@ -199,16 +199,70 @@ History is not only an audit log: it should support reusing prior work.
 
 A previous run may therefore be duplicated/reused as the starting point for a new session without automatically resubmitting it.
 
+## 2026-08-07 — Reliability boundary decisions
+
+### Submission intent and orphan safety
+
+**Decision:** persist a local submission-intent record before sending each potentially billable ArtWorks task-creation request.
+
+The intent should include a client-generated UUID/correlation value, the local run/step identity, request fingerprint/parameters, and a wall-clock timestamp. After ArtWorks returns a task ID, update the same logical record immediately with that ID.
+
+**Decision:** an ambiguous submission record with no returned task ID must never be blindly auto-resubmitted after restart. The first request may have created a billable task even though the response was lost.
+
+**Open provider blocker:** determine whether ArtWorks provides task-creation idempotency, a queryable client request/correlation field, or authenticated task listing/search sufficient to recover the POST-accepted / ID-not-persisted orphan window.
+
+Current project evidence does not establish those capabilities. `batchId` and `tags` must not be treated as idempotency/recovery keys without provider evidence.
+
+### Completed-result retention
+
+**Open provider blocker:** determine completed task retention, result-media retention, video URL lifetime, and whether re-fetching a completed task refreshes an expired result URL.
+
+Foreground-only recovery is acceptable only if the provider's retention behavior covers realistic return intervals or exposes a reliable refresh/retrieval path.
+
+### Browser storage persistence
+
+**Decision:** use IndexedDB for structured non-secret task/run/history state and request persistent storage when supported.
+
+**Decision:** on launch, call `navigator.storage.persisted()`; call `navigator.storage.persist()` only if persistence is not already granted.
+
+Primary WebKit documentation states persistent mode is remembered across sessions, so unconditional `persist()` on every launch is not the documented requirement.
+
+**Documented platform finding:** first-party storage for installed Home Screen web apps is explicitly exempt from WebKit ITP's historic seven-day script-writable-storage deletion rule. This does not eliminate other storage-loss scenarios, so state-loss UX remains required.
+
+### Wall-clock recovery
+
+**Decision:** all retry backoff, task timeout, priority-promotion, phase-duration, and progress timing logic must derive from persisted wall-clock timestamps.
+
+Do not resume JavaScript tick counters after suspension. The callbacks stopped; real time did not.
+
+If a remote state transition happened while the PWA was suspended and the provider does not expose an authoritative transition timestamp, show the timing as observed/derived rather than exact.
+
+### Screen Wake Lock
+
+**Decision:** Screen Wake Lock may be used as an optional attended-mode enhancement while the user intentionally watches an active generation.
+
+It must not be described or implemented as background execution. Expect the lock to be released when visibility is lost and re-acquire only when the attended state still applies.
+
+### Narrow notification relay
+
+**Open architecture option:** preserve the possibility of a minimal push relay that stores only an opaque ArtWorks task/correlation identifier mapped to a Web Push subscription.
+
+Such a relay would not hold the reusable ArtWorks credential, poll ArtWorks, fetch results, or store prompts/media. It becomes viable only if ArtWorks provides a trusted completion callback/webhook or equivalent provider-side event that can be registered/correlated from the device's own authenticated session.
+
+Webhook/callback availability remains unknown.
+
 ## Questions still open after this session
 
 The following remain discovery items rather than settled implementation claims:
 
 1. Exact dedicated production and PR-preview URL layout for `pwa/` in the existing GitHub Pages workflow.
-2. Whether direct browser-to-ArtWorks requests are permitted by the provider's CORS policy.
-3. Exact secure device-local credential storage UX and threat model.
-4. Which background execution, Background Sync, notification, and Web Push capabilities are dependable on the targeted iOS/PWA versions.
-5. How automatic downloads behave in installed iOS PWAs and what user gesture/browser restrictions apply.
-6. Which Python media-processing behaviors beyond concatenation are needed in browser form, and which should intentionally be omitted.
-7. Exact persistent storage model for recovery/history, including whether IndexedDB should replace or supplement `localStorage` for structured task state.
-8. Final application icon assets and manifest icon set.
-9. Whether the external JetBrains Mono dependency should remain, fall back, or be self-hosted.
+2. Whether direct browser-to-ArtWorks requests are permitted by the provider's CORS policy, including Basic `Authorization` preflight.
+3. Whether ArtWorks task creation supports an idempotency key, unique client request ID, or another duplicate-safe submission mechanism.
+4. Whether ArtWorks exposes task listing/search or queryable `tag`/`batchId`/correlation semantics suitable for recovering orphaned submissions.
+5. Completed-task retention, result-media retention, result URL TTL, and result URL refresh behavior.
+6. Whether ArtWorks exposes webhook/callback registration or another provider-side completion event, and its authentication model.
+7. Exact secure device-local credential UX in installed Home Screen mode, including Password AutoFill behavior.
+8. How automatic downloads behave in installed iOS PWAs and what user gesture/browser restrictions apply.
+9. Reliable browser-native final-frame extraction from real ArtWorks result media for Chain mode.
+10. Final application icon assets and manifest icon set.
+11. Whether the external JetBrains Mono dependency should remain, fall back, or be self-hosted.
