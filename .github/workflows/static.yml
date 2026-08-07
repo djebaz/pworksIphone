@@ -1,0 +1,52 @@
+# VERSION$00041$ | Edited: 07/08 | TIME: 06:23
+# Deploys shortcuts/img2video/ as the root of the GitHub Pages site.
+
+name: Deploy Img2Video to GitHub Pages
+
+on:
+  # Deploy when the published site or this workflow changes on main.
+  push:
+    branches: ["main"]
+    paths:
+      - "shortcuts/img2video/**"
+      - ".github/workflows/pages.yml"
+
+  # Allow manual deployment from the Actions tab.
+  workflow_dispatch:
+
+# Permissions required for GitHub Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one Pages deployment at a time.
+# Do not cancel an in-progress production deployment.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          # Publish this directory as the root of the Pages site.
+          path: "./shortcuts/img2video"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
