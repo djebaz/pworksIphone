@@ -1,0 +1,8 @@
+# VERSION$00036$ | Edited: 07/08 | TIME: 05:47
+# Pool used by experimentalLoopCount. One unique prompt per non-comment line.
+
+Static camera, subtle natural movement.
+Small head movement with natural blinking.
+Gentle posture shift and breathing.
+Slow glance to the side, then back toward camera.
+Subtle shoulder and upper-body movement.
