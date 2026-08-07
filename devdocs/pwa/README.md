@@ -1,4 +1,4 @@
-<!-- VERSION$00005$ | Edited: 07/08 | TIME: 19:01 -->
+<!-- VERSION$00006$ | Edited: 07/08 | TIME: 19:04 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -21,6 +21,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
 - [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local/user-owned credential model, Password AutoFill preference, threat model, CSP direction, and browser/API constraints.
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
+- [`external-research-review.md`](external-research-review.md) — review of the user-supplied August 2026 iOS PWA background-execution research, including Declarative Web Push, Safari 26 installability, Wake Lock, foreground checkpoints, server-vs-device tradeoffs, and the resulting Img2Video recommendations.
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
@@ -60,6 +61,8 @@ Chain mode remains feasible in principle but requires validation of browser-nati
 The PWA intentionally does not reproduce shell execution or FFmpeg video concatenation; every ArtWorks output remains independent.
 
 The current background-execution recommendation is foreground-first orchestration with durable IndexedDB recovery. A Service Worker must not be treated as a persistent poller. It becomes useful when a concrete event-driven feature such as Web Push is implemented.
+
+The August 2026 external research review reinforces that Background Sync, Periodic Background Sync, keep-alive timers, WebSockets, audio tricks, and Wake Lock do not provide dependable iOS background execution. Wake Lock may still be useful as an optional foreground UX feature. Classic Web Push can briefly wake a Service Worker but requires a visible notification; Declarative Web Push is preferable for pure notifications because it deliberately avoids JavaScript execution.
 
 Modern iOS Home Screen web apps can receive Web Push, but a server-side push sender and a meaningful external completion event are required. ArtWorks webhook/callback availability is currently unknown.
 
@@ -118,6 +121,8 @@ The desired iOS standalone appearance should blend into the application's existi
 No custom installation banner is planned initially; use normal browser/OS installation flows.
 
 The final application icon is being prepared separately, so no temporary icon should be introduced.
+
+Safari/WebKit 26 no longer requires a manifest or Service Worker merely for Home Screen web-app installation. Img2Video should still ship a manifest because it provides stable application identity, icons, theme, display mode, start URL, scope, and cross-browser PWA semantics.
 
 ## Research discipline
 
