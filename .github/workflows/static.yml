@@ -1,4 +1,4 @@
-# VERSION$00085$ | Edited: 07/08 | TIME: 13:57
+# VERSION$00086$ | Edited: 07/08 | TIME: 14:40
 # Publishes main at the Pages root and every open PR under /preview/pr-<number>/.
 
 name: Deploy Img2Video to GitHub Pages
@@ -115,7 +115,12 @@ jobs:
 
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: >-
+        ${{ github.event_name == 'pull_request' && github.event.action != 'closed'
+            && format('{0}preview/pr-{1}/', steps.deployment.outputs.page_url, github.event.pull_request.number)
+            || github.event_name == 'pull_request'
+            && format('{0}preview/', steps.deployment.outputs.page_url)
+            || steps.deployment.outputs.page_url }}
 
     steps:
       - name: Deploy to GitHub Pages
