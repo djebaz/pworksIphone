@@ -1,5 +1,5 @@
-# VERSION$00079$ | Edited: 07/08 | TIME: 13:26
-# Deploys shortcuts/img2video/ as the root of the GitHub Pages site.
+# VERSION$00080$ | Edited: 07/08 | TIME: 13:47
+# Publishes main at the Pages root and every open PR under /preview/pr-<number>/.
 
 name: Deploy Img2Video to GitHub Pages
 
@@ -10,24 +10,93 @@ on:
       - "shortcuts/img2video/**"
       - ".github/workflows/static.yml"
 
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
   pages: write
   id-token: write
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          path: source
+
+      - name: Build production and PR previews
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p site/preview
+          cp -a source/shortcuts/img2video/. site/
+
+          mapfile -t prs < <(
+            gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[].number'
+          )
+
+          for pr in "${prs[@]}"; do
+            ref="refs/remotes/origin/pr-${pr}"
+            git -C source fetch --no-tags --depth=1 origin \
+              "refs/pull/${pr}/head:${ref}"
+
+            tmp="$(mktemp -d)"
+            git -C source archive "${ref}" shortcuts/img2video | tar -x -C "${tmp}"
+
+            mkdir -p "site/preview/pr-${pr}"
+            cp -a "${tmp}/shortcuts/img2video/." "site/preview/pr-${pr}/"
+            rm -rf "${tmp}"
+          done
+
+          {
+            printf '%s\n' '<!doctype html>'
+            printf '%s\n' '<meta charset="utf-8">'
+            printf '%s\n' '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            printf '%s\n' '<title>Img2Video PR previews</title>'
+            printf '%s\n' '<h1>Img2Video PR previews</h1>'
+            if ((${#prs[@]} == 0)); then
+              printf '%s\n' '<p>No open pull-request previews.</p>'
+            else
+              printf '%s\n' '<ul>'
+              for pr in "${prs[@]}"; do
+                printf '<li><a href="./pr-%s/">PR #%s</a></li>\n' "${pr}" "${pr}"
+              done
+              printf '%s\n' '</ul>'
+            fi
+          } > site/preview/index.html
+
+          base_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          {
+            echo "### GitHub Pages deployment"
+            echo
+            echo "Production: ${base_url}/"
+            echo
+            if ((${#prs[@]})); then
+              echo "Open PR previews:"
+              for pr in "${prs[@]}"; do
+                echo "- PR #${pr}: ${base_url}/preview/pr-${pr}/"
+              done
+            else
+              echo "No open PR previews."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -35,7 +104,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: "./shortcuts/img2video"
+          path: "./site"
 
   deploy:
     needs: build
