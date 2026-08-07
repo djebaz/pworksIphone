@@ -1,4 +1,4 @@
-# VERSION$00054$ | Edited: 07/08 | TIME: 08:38
+# VERSION$00055$ | Edited: 07/08 | TIME: 08:40
 """Generate a video from a local image with the ArtWorks API.
 
 Designed for a-Shell Mini on iPhone. Uses only Python's standard library.
@@ -1419,11 +1419,11 @@ def parse_args():
     fps = parse_int(settings.get("fps", default_fps), "fps", 8, 24)
     frames = parse_int(settings.get("numFrames", default_frames), "numFrames", 24, 361)
     # Deliberately not validated yet: interpolationFps is a stored preference
-    # that only matters once interpolation is actually requested (enabled, or
-    # --interpolate given explicitly on the command line). Whether that is the
-    # case is only known after full argument parsing below, so an inactive
-    # preference here is not validated and cannot abort a run that would never
-    # transmit it.
+    # that only matters once applyInterpolation ends up true. --interpolate does
+    # not by itself make it active; only --interpolation/--no-interpolation (or
+    # the settings default) decides that, and only after full argument parsing
+    # below. An inactive preference here is not validated and cannot abort a
+    # run that would never transmit it.
     interpolation_fps_configured = settings.get("interpolationFps", str(DEFAULT_INTERPOLATION_FPS))
 
     if settings.get("priority"):
