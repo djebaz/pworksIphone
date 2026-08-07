@@ -1,4 +1,4 @@
-<!-- VERSION$00003$ | Edited: 07/08 | TIME: 19:08 -->
+<!-- VERSION$00004$ | Edited: 07/08 | TIME: 20:07 -->
 # PWA Discovery Decision Log
 
 This file records explicit decisions and open choices from the PWA discovery session so later implementation work does not silently reinterpret them.
@@ -251,18 +251,114 @@ Such a relay would not hold the reusable ArtWorks credential, poll ArtWorks, fet
 
 Webhook/callback availability remains unknown.
 
-## Questions still open after this session
+## 2026-08-07 — Consolidated runtime architecture decisions
+
+The following decisions supersede earlier open wording where they conflict.
+
+### Reconciler-first execution
+
+**Decision:** the reconciler, backed by a durable IndexedDB ledger, is the correctness core of the PWA. The foreground polling loop is an optimization and must not own authoritative state.
+
+Run reconciliation on cold start, on return to visible state, and when connectivity returns. Recompute every retry/timeout/priority action from persisted wall-clock timestamps.
+
+### Ledger shape
+
+**Decision:** model durable execution as `Run -> Step -> Task` records.
+
+Each task record should include local run/step identity, a client submission UUID, a request fingerprint that excludes raw image bytes, status, nullable remote task ID, submission/observation timestamps, result/export state, and preserved error evidence.
+
+### Locked credentials are not task failure
+
+**Decision:** after a cold start, a known task may exist while Password AutoFill credentials are unavailable. Display an authentication-required/locked state and retain the task unchanged until the user unlocks credentials.
+
+### Serialized billable creation
+
+**Decision:** serialize new task-creation POSTs even for logical parallel runs. Once a remote ID is durably bound, polling/output handling may proceed concurrently with bounded concurrency.
+
+Reason: only one task should be exposed to the POST-accepted / ID-not-persisted orphan window at a time.
+
+### Current orphan strategy
+
+**Decision:** production correctness must not depend on undocumented idempotency, task listing, or tag search.
+
+The authenticated contract currently does not document those operations. A local UUID and optional deterministic task tag remain useful correlation evidence, but an ambiguous submission with no task ID requires explicit user disposition and must never be silently resubmitted.
+
+**Decision:** do not send an undocumented `Idempotency-Key` header by default. Besides lacking provider contract evidence, adding a custom header changes the browser preflight requirements.
+
+### Full status enum
+
+**Documented finding:** the authenticated OpenAPI task-info schema includes `preparing` and `unknown` in addition to the shorter lifecycle list in AGENTS.md.
+
+**Decision:** treat `preparing` and initial `unknown` observations as non-terminal. Apply bounded unknown/retry logic while preserving the remote task ID.
+
+### Async task endpoint
+
+**Decision:** production PWA execution uses `POST /api/v3/tasks`, never `/tasks-sync`.
+
+The provider documents `/tasks-sync` as test/debug only. The asynchronous endpoint is also the safer lifecycle shape because it returns the remote task ID before the long generation period.
+
+### Notification relay removed from active stages
+
+**Decision:** remove the credential-free relay from the active implementation plan under the current authenticated provider contract.
+
+Webhook/callback registration is not documented. A relay that polls ArtWorks would need the reusable credential and would violate the selected credential boundary. Revisit only if a provider callback/event contract is later established.
+
+### Output staging
+
+**Decision:** separate remote completion, browser staging, and user-visible export as distinct durable states.
+
+OPFS is a candidate private staging area for completed media; user-visible Files/Photos export remains an explicit foreground action that requires iPhone validation. Stream bytes rather than holding the complete output in memory where practical.
+
+### Chain implementation
+
+**Decision:** do not ship FFmpeg/ffmpeg.wasm for normal Chain advancement.
+
+Preferred production candidate:
+
+```text
+Mediabunny UrlSource
+-> Input({ formats: [MP4] })
+-> track.canDecode()
+-> VideoSampleSink.getSample(Infinity)
+-> canvas
+-> JPEG/PNG Blob
+-> next task
+```
+
+Use bounded `UrlSource` retry policy, explicit media-resource cleanup, and a pinned locally served Mediabunny build. Keep MP4Box.js + direct WebCodecs as the lower-level debug/fallback route and `<video>` + canvas as the simplest compatibility experiment.
+
+### Orion extension findings
+
+**Confirmed from supplied packages:** the RedGifs Orion extension delegates direct MP4 URLs to the privileged extension downloads API; Orion Lite controls an existing `HTMLVideoElement` and performs no media-byte processing.
+
+**Decision:** keep ordinary playback/preview browser-native. Bring video bytes into JavaScript only for operations that actually require sample-level access, chiefly exact Chain final-frame extraction.
+
+Do not treat Orion extension host/download permissions as evidence that a normal GitHub Pages PWA can bypass CORS or use extension download APIs.
+
+### Dual runtime boundary
+
+**Decision:** the PWA becomes the production interaction/orchestration surface, while Python plus project probes remains the authoritative provider-discovery and deep media-measurement environment.
+
+Mediabunny can expose useful codec/dimensions/duration/FPS/bitrate/sample information, but the PWA does not replace `ffprobe`-grade evidence required by AGENTS.md.
+
+### `run-ffmpeg`
+
+**Documented finding:** the authenticated generic task-type enum contains `run-ffmpeg`.
+
+**Open provider question:** payload schema, account entitlement, URL-to-URL semantics, retention, and billing/cost are not established by the current discovery evidence. It is not required for the selected Chain path.
+
+## Questions still open after consolidation
 
 The following remain discovery items rather than settled implementation claims:
 
-1. Exact dedicated production and PR-preview URL layout for `pwa/` in the existing GitHub Pages workflow.
+1. Exact dedicated production and PR-preview URL layout for `pwa/` in the existing GitHub Pages workflow, including the credential trust boundary for preview/fork deployments.
 2. Whether direct browser-to-ArtWorks requests are permitted by the provider's CORS policy, including Basic `Authorization` preflight.
-3. Whether ArtWorks task creation supports an idempotency key, unique client request ID, or another duplicate-safe submission mechanism.
-4. Whether ArtWorks exposes task listing/search or queryable `tag`/`batchId`/correlation semantics suitable for recovering orphaned submissions.
-5. Completed-task retention, result-media retention, result URL TTL, and result URL refresh behavior.
-6. Whether ArtWorks exposes webhook/callback registration or another provider-side completion event, and its authentication model.
-7. Exact secure device-local credential UX in installed Home Screen mode, including Password AutoFill behavior.
-8. How automatic downloads behave in installed iOS PWAs and what user gesture/browser restrictions apply.
-9. Reliable browser-native final-frame extraction from real ArtWorks result media for Chain mode.
+3. ArtWorks result-media CORS and partial/range-read behavior required for JavaScript/Mediabunny access.
+4. Completed-task retention, result-media retention, result URL TTL, and whether re-querying a completed task returns/refreshed a usable media URL.
+5. Exact secure device-local credential UX in installed Home Screen mode, including Password AutoFill behavior.
+6. How user-visible export/save/share behaves in installed iOS PWAs and what user-gesture restrictions apply.
+7. Mediabunny decoding and `getSample(Infinity)` behavior on representative real Wan/LTX outputs on the target iPhone.
+8. Whether the extracted JPEG/PNG transition frame is accepted unchanged by the next ArtWorks image-to-video request.
+9. `run-ffmpeg` payload schema, account availability, and cost if future server-side media transforms are considered.
 10. Final application icon assets and manifest icon set.
 11. Whether the external JetBrains Mono dependency should remain, fall back, or be self-hosted.
