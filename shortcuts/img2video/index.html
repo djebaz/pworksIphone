@@ -1,4 +1,4 @@
-<!-- VERSION$00084$ | Edited: 07/08 | TIME: 13:57 -->
+<!-- VERSION$00087$ | Edited: 07/08 | TIME: 14:10 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -90,7 +90,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px}
 .promptitem:last-of-type{border:0}
 .promptactions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .promptactions .btn{min-height:32px;font-size:10.5px}
-.seedrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.seedrow .btn{min-width:96px}
+.seedrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.seedrow .btn{min-width:96px}.seedrow .btn[aria-pressed="true"]{color:var(--accent-1);border-color:rgba(251,191,36,.58);background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(236,72,153,.09),rgba(139,92,246,.15))}#seed:disabled{opacity:.45;cursor:not-allowed}
 .commandtoggle{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.commandtoggle .note{display:flex;align-items:center;gap:7px}.commandchev{display:inline-block;min-width:10px;color:var(--accent-1);font-size:12px}
 pre{margin:0;padding:11px 12px;border:1px solid rgba(157,129,243,.18);border-radius:8px;background:rgba(7,5,18,.44);font:11px/1.45 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
@@ -102,11 +102,11 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 </head>
 <body>
 <main>
-<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00084</span></header>
+<header><div><p class="eyebrow">ArtWorks · Safari → Shortcut → a‑Shell</p><h1>Img2Video</h1><p class="copy">Pick an image, then send its filename and the remaining command to your Shortcut.</p></div><span class="pill version">SAFARI UI · 00087</span></header>
 <form id="form" class="stack">
 
 <section class="card config"><div class="head"><h2 class="title">Preset</h2><span class="note">Predefined library from presets.txt</span></div><div class="body grid">
-<div class="field"><div class="row"><label>Preset</label><span id="presetHelp" class="help">No preset matches current settings</span></div><div class="configrow"><div class="presetwrap"><button id="presetButton" class="presetbutton" type="button"><span id="presetLabel">Custom</span><span class="chev">▾</span></button><div id="presetMenu" class="presetmenu"><button type="button" data-custom="1">Custom</button><div id="presetItems"></div></div></div><input id="settingsInput" class="file" type="file" accept=".txt,text/plain"><button id="importSettings" class="importbtn" type="button" title="Import settings.txt" aria-label="Import settings.txt">⇪</button></div></div>
+<div class="field"><div class="row"><label>Preset</label><span id="presetHelp" class="help">No preset matches current settings</span></div><div class="configrow"><div class="presetwrap"><button id="presetButton" class="presetbutton" type="button"><span id="presetLabel">Custom</span><span class="chev">▾</span></button><div id="presetMenu" class="presetmenu"><div id="presetItems"></div></div></div><input id="settingsInput" class="file" type="file" accept=".txt,text/plain"><button id="importSettings" class="importbtn" type="button" title="Import settings.txt" aria-label="Import settings.txt">⇪</button></div></div>
 <p class="help" style="text-align:left;font-size:9.5px;line-height:1.35;margin:0">Auto: switches to Custom when values differ from all presets</p>
 <p id="configFeedback" class="feedback"></p>
 </div></section>
@@ -133,7 +133,7 @@ footer{position:fixed;z-index:5;left:0;right:0;bottom:0;padding:10px 15px max(10
 <div class="field"><label>Performance</label><div class="segment" style="--count:3"><input id="speed" type="radio" name="performance" value="speed" checked><label for="speed">Speed</label><input id="quality" type="radio" name="performance" value="quality"><label for="quality">Quality</label><input id="express" type="radio" name="performance" value="express"><label for="express">Express</label></div></div>
 <div class="field"><div class="row"><label>Request FPS</label><span class="help">Model-specific range</span></div><div class="range"><input id="fpsRange" type="range"><input id="fps" type="number"></div><div class="bounds"><span id="fpsMin"></span><span id="fpsMax"></span></div></div>
 <div class="field"><div class="row"><label>Requested frames</label><span class="help">Output may normalize</span></div><div class="range"><input id="framesRange" type="range"><input id="frames" type="number"></div><div class="bounds"><span id="framesMin"></span><span id="framesMax"></span></div></div>
-<div class="field"><div class="row"><label for="seed">Seed</label><span id="seedHelp" class="help">Optional signed 64-bit integer</span></div><div class="seedrow"><input id="seed" type="text" value="" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Random"><button id="randomizeSeed" class="btn" type="button">Randomize</button></div></div>
+<div class="field"><div class="row"><label for="seed">Seed</label><span id="seedHelp" class="help">Explicit --seed · signed 64-bit integer</span></div><div class="seedrow"><input id="seed" type="text" value="42" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false"><button id="seedToggle" class="btn" type="button" aria-pressed="false">No CLI seed</button></div></div>
 <div class="field"><div class="row"><label>Queue priority</label><span class="help">1 highest · 5 normal</span></div><div class="range"><input id="priorityRange" type="range" min="1" max="5"><input id="priority" type="number" min="1" max="5"></div></div>
 </div></section>
 
@@ -171,7 +171,7 @@ const GENERATION_KEYS=["model","resolution","performance","fps","frames","priori
 const DEFAULTS={
   imagePath:"",
   prompts:["Static camera, subtle natural movement."],
-  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,seed:"",priority:1,
+  model:"ltx-2.3",resolution:"480p",performance:"speed",fps:24,frames:360,seed:"42",seedDisabled:false,priority:1,
   optimizations:false,interpolation:false,interpolationFps:24,
   generationMode:"chain",combineVideos:true,maxParallelTasks:6,
   playOnFinish:false
@@ -247,6 +247,7 @@ function state(){
     fps:Number($("fps").value),
     frames:Number($("frames").value),
     seed:$("seed").value.trim(),
+    seedDisabled:$("seedToggle").getAttribute("aria-pressed")==="true",
     priority:Number($("priority").value),
     optimizations:$("optimizations").checked,
     interpolation:$("interpolation").checked,
@@ -277,7 +278,7 @@ function argGroups(current){
   groups.push("--fps "+current.fps);
   groups.push("--frames "+current.frames);
   const seed=seedValue(current.seed);
-  if(seed.text)groups.push("--seed "+seed.text);
+  if(!current.seedDisabled&&seed.text)groups.push("--seed "+seed.text);
   groups.push("--priority "+current.priority);
   groups.push(current.optimizations?"--optimizations":"--no-optimizations");
   groups.push(current.interpolation?"--interpolation":"--no-interpolation");
@@ -317,6 +318,17 @@ function applyInterpolationState(){
   const on=$("interpolation").checked;
   $("interpolationFpsField").classList.toggle("disabled",!on);
   for(const rate of INTERPOLATION_FPS_CHOICES)$("ifps"+rate).disabled=!on;
+}
+
+function applySeedState(current){
+  const disabled=Boolean(current.seedDisabled);
+  $("seed").disabled=disabled;
+  $("seedToggle").setAttribute("aria-pressed",disabled?"true":"false");
+  const seed=seedValue(current.seed);
+  const valid=disabled||seed.valid;
+  $("seed").setAttribute("aria-invalid",valid?"false":"true");
+  $("seedHelp").textContent=disabled?"No --seed sent by Safari":seed.valid?"Explicit --seed · signed 64-bit integer":"Invalid signed 64-bit integer";
+  $("seedHelp").style.color=valid?"":"var(--danger-3)";
 }
 
 function updateMotionVisibility(){
@@ -417,11 +429,8 @@ function refresh({persist=true}={}){
   applyInterpolationState();
   updateMotionVisibility();
   const current=state();
+  applySeedState(current);
   updateExecutionState(current);
-  const seed=seedValue(current.seed);
-  $("seed").setAttribute("aria-invalid",seed.valid?"false":"true");
-  $("seedHelp").textContent=seed.valid?"Optional signed 64-bit integer":"Invalid signed 64-bit integer";
-  $("seedHelp").style.color=seed.valid?"":"var(--danger-3)";
   $("imagePath").value=current.imagePath;
   $("promptCount").textContent=current.prompts.length+(current.prompts.length===1?" prompt":" prompts");
   lastCommand=command(current);
@@ -447,7 +456,9 @@ function restore(saved,{persist=false}={}){
   selectRadio("performance",KNOWN_PERF.includes(merged.performance)?merged.performance:DEFAULTS.performance);
   $("fps").value=merged.fps;
   $("frames").value=merged.frames;
-  $("seed").value=String(merged.seed??"");
+  const restoredSeed=String(merged.seed??"").trim();
+  $("seed").value=restoredSeed||DEFAULTS.seed;
+  $("seedToggle").setAttribute("aria-pressed",merged.seedDisabled?"true":"false");
   syncPair("priorityRange","priority",merged.priority,1,5,DEFAULTS.priority);
   $("optimizations").checked=Boolean(merged.optimizations);
   $("interpolation").checked=Boolean(merged.interpolation);
@@ -535,7 +546,11 @@ function applyGenerationFields(fields){
   if(fields.performance!==undefined)selectRadio("performance",fields.performance);
   $("fps").value=clamp(fields.fps??$("fps").value,limits.fps[0],limits.fps[1],Number($("fps").value));
   $("frames").value=clamp(fields.frames??$("frames").value,limits.frames[0],limits.frames[1],Number($("frames").value));
-  if(fields.seed!==undefined&&seedValue(fields.seed).valid)$("seed").value=seedValue(fields.seed).text;
+  if(fields.seed!==undefined&&seedValue(fields.seed).valid){
+    const parsedSeed=seedValue(fields.seed);
+    if(parsedSeed.text){$("seed").value=parsedSeed.text;$("seedToggle").setAttribute("aria-pressed","false")}
+    else $("seedToggle").setAttribute("aria-pressed","true");
+  }
   if(fields.priority!==undefined)syncPair("priorityRange","priority",fields.priority,1,5,Number($("priority").value));
   if(fields.optimizations!==undefined)$("optimizations").checked=Boolean(fields.optimizations);
   if(fields.interpolation!==undefined)$("interpolation").checked=Boolean(fields.interpolation);
@@ -590,7 +605,6 @@ $("presetMenu").addEventListener("click",event=>{
   const button=event.target.closest("button");
   if(!button)return;
   $("presetMenu").classList.remove("open");
-  if(button.dataset.custom)return;
   const preset=presets[button.dataset.name];
   if(!preset)return;
   applyGenerationFields(preset);
@@ -662,17 +676,9 @@ $("addPrompt").addEventListener("click",()=>{
   refresh();
 });
 
-$("randomizeSeed").addEventListener("click",()=>{
-  let value;
-  try{
-    const words=new Uint32Array(2);
-    crypto.getRandomValues(words);
-    const unsigned=(BigInt(words[0])<<32n)|BigInt(words[1]);
-    value=unsigned>SEED_MAX?unsigned-(1n<<64n):unsigned;
-  }catch{
-    value=BigInt(Math.floor(Math.random()*0x7fffffff));
-  }
-  $("seed").value=value.toString();
+$("seedToggle").addEventListener("click",()=>{
+  const disabled=$("seedToggle").getAttribute("aria-pressed")!=="true";
+  $("seedToggle").setAttribute("aria-pressed",disabled?"true":"false");
   refresh();
 });
 
@@ -705,7 +711,7 @@ $("form").addEventListener("change",event=>{
 $("copy").addEventListener("click",async()=>{
   clearStatus();
   const current=state();
-  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
+  if(!current.seedDisabled&&!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
   try{await navigator.clipboard.writeText(lastCommand);$("runStatus").textContent="COPIED"}
   catch{showError("Clipboard unavailable — press and hold the command; its line breaks are shell-safe continuations.")}
 });
@@ -727,7 +733,7 @@ $("form").addEventListener("submit",event=>{
   const current=state();
   if(!basename(current.imagePath))return showError("Choose an image or enter its filename.");
   if(!current.prompts.length||current.prompts.some(prompt=>!prompt))return showError("Enter a motion prompt for every prompt block.");
-  if(!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
+  if(!current.seedDisabled&&!seedValue(current.seed).valid)return showError("Seed must be a signed 64-bit integer.");
   location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(shortcutPayload(current));
 });
 
