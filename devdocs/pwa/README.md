@@ -1,4 +1,4 @@
-<!-- VERSION$00011$ | Edited: 07/08 | TIME: 20:08 -->
+<!-- VERSION$00012$ | Edited: 07/08 | TIME: 20:13 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -20,11 +20,11 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`decision-log.md`](decision-log.md) — explicit decisions and open choices from the discovery sessions.
 - [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
 - [`runtime-architecture.md`](runtime-architecture.md) — consolidated reconciler-led production architecture: credential layer, durable Run/Step/Task ledger, serialized creation, orphan handling, staging/export, Chain, provider surface assumptions, and implementation stages.
-- [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local/user-owned credential model, Password AutoFill preference, threat model, CSP direction, and browser/API constraints.
+- [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected user-owned credential model, Password AutoFill preference, same-origin preview/fork trust boundary, CSP direction, and browser/API constraints.
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
 - [`external-research-review.md`](external-research-review.md) — review of the user-supplied August 2026 iOS PWA background-execution research, including Declarative Web Push, Safari 26 installability, Wake Lock, foreground checkpoints, server-vs-device tradeoffs, and the resulting Img2Video recommendations.
-- [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
-- [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay option.
+- [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including serialized creation, reconciler-first execution, Chain, and the dual diagnostic/runtime boundary.
+- [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay concept.
 - [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
 - [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain strategy, preferring Mediabunny for remote MP4 reading and presentation-order final-frame decoding, with MP4Box.js + direct WebCodecs retained as a lower-level fallback.
 - [`orion-ios-extension-findings.md`](orion-ios-extension-findings.md) — direct inspection of two supplied Orion extension packages and the distinction between HTMLVideoElement control, privileged extension downloads, and PWA sample-level media access.
