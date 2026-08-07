@@ -1,4 +1,4 @@
-<!-- VERSION$00033$ | Edited: 07/08 | TIME: 04:47 -->
+<!-- VERSION$00040$ | Edited: 07/08 | TIME: 05:57 -->
 # Developer Documentation
 
 `devdocs/` contains the durable technical documentation and reference material for pworksIphone. Runtime code and reusable tools live elsewhere in the repository.
@@ -14,6 +14,7 @@ devdocs/
 │   ├── annotated-en.html
 │   └── annotated-fr.html
 └── references/
+    ├── export-public-shortcut-as-json.md
     └── styles.css
 ```
 
@@ -38,11 +39,13 @@ The live Safari-facing UI is not documentation and therefore lives at `shortcuts
 
 The signed, installable Shortcut artifact is not documentation either and therefore lives at `shortcuts/img2video/dist/Run_Img2Video_in_a-Shell.shortcut`.
 
-The utility used to download and extract unsigned Shortcut data is a reusable tool and therefore lives at `tools/shortcuts/dlshort.py`.
+The project utility used to download and extract unsigned Shortcut data is `tools/shortcuts/dlshort.py`.
 
 ## `references/`
 
-Material from other projects retained only as implementation or design reference.
+Material from other projects or external sources retained only as implementation or design reference.
+
+`export-public-shortcut-as-json.md` documents an external workflow for taking a publicly shared iCloud Shortcut, retrieving its metadata through the iCloud `api/records/<ID>` endpoint, downloading the unsigned workflow plist, and decoding that plist for JSON inspection. It is reference material that complements `tools/shortcuts/dlshort.py`; it does **not** replace the project tool. For this iPhone/a-Shell Mini project, `tools/shortcuts/dlshort.py` remains the preferred implementation because it follows the project's portable standard-library Python approach.
 
 `styles.css` is a reference stylesheet from another project. It is not a pworksIphone runtime dependency and should not be treated as the production stylesheet.
 
