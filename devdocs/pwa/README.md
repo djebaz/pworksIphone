@@ -1,4 +1,4 @@
-<!-- VERSION$00009$ | Edited: 07/08 | TIME: 19:46 -->
+<!-- VERSION$00010$ | Edited: 07/08 | TIME: 19:51 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -25,7 +25,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
 - [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay option.
 - [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
-- [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain path using MP4Box.js for MP4/sample inspection, WebCodecs for H.264 decoding, and canvas for the single transition image.
+- [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain strategy, now preferring Mediabunny for remote MP4 reading and presentation-order final-frame decoding, with MP4Box.js + direct WebCodecs retained as a lower-level fallback.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
 ## Current direction
@@ -59,7 +59,7 @@ The Python/a-Shell process attempts to keep polling continuously, while the PWA 
 
 In that sense, the Python client's recovery model becomes the PWA's normal execution model.
 
-Chain mode no longer has an FFmpeg dependency in the selected design. The preferred precise path is MP4Box.js for MP4/sample inspection plus WebCodecs `VideoDecoder` for the final GOP, followed by canvas export of exactly one transition frame. A simpler `<video>` + canvas path remains a prototype/fallback. The selected Chain design does not require `VideoEncoder`, audio processing, muxing, or ffmpeg.wasm.
+Chain mode no longer has an FFmpeg dependency in the selected design. The preferred implementation candidate is Mediabunny: its `UrlSource` can read remote MP4 data efficiently, `InputVideoTrack.canDecode()` checks the actual browser codec capability, and `VideoSampleSink.getSample(Infinity)` directly retrieves the last decoded frame in presentation order. That frame can be exported through canvas as the next transition image. MP4Box.js + direct WebCodecs remains the lower-level fallback/debug path. The Chain design does not require `VideoEncoder`, audio processing, muxing, or ffmpeg.wasm.
 
 The PWA intentionally does not reproduce shell execution or FFmpeg video concatenation; every ArtWorks output remains independent.
 
@@ -135,9 +135,11 @@ Each completed ArtWorks output is an independent file; the PWA will not reproduc
 
 Automatic output export/download remains a foreground/browser capability that needs physical-device testing on iOS. Durable export state should allow retry after interruption.
 
-Chain mode still needs the previous output's final displayed frame. The selected precise approach is MP4Box.js + WebCodecs: identify the final presentation sample and preceding sync sample, decode only the required final GOP, select the target `VideoFrame`, draw it to canvas, and export a still-image Blob. This remains subject to result-media CORS/Range behavior and physical-device validation.
+Chain mode still needs the previous output's final displayed frame. Mediabunny is now the preferred implementation candidate because its media sinks provide decoded samples in presentation order and explicitly support retrieving the last sample with `getSample(Infinity)`. Its remote `UrlSource` also provides optimized network reading, reducing the need for application-owned MP4 range parsing. Result-media CORS/partial-read behavior and real-device Safari decoding still require validation.
 
-The PWA may gain useful lightweight MP4 metadata through MP4Box.js, but Python plus `ffprobe`/project probes remains the authoritative deep media measurement and provider-discovery environment. The PWA is the production surface, not a wholesale replacement for the diagnostic runtime.
+Mediabunny also exposes useful codec, dimensions, duration and packet statistics, but Python plus `ffprobe`/project probes remains the authoritative deep media measurement and provider-discovery environment. The PWA is the production surface, not a wholesale replacement for the diagnostic runtime.
+
+For security, any selected Mediabunny build should be pinned and served locally from the repository-controlled PWA rather than loaded from a third-party CDN at runtime.
 
 ## Deployment direction
 
