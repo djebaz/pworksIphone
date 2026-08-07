@@ -1,4 +1,4 @@
-<!-- VERSION$00002$ | Edited: 07/08 | TIME: 19:50 -->
+<!-- VERSION$00003$ | Edited: 07/08 | TIME: 19:53 -->
 # PWA Chain Media Strategy
 
 ## Purpose
@@ -11,11 +11,11 @@ The PWA does **not** need to transcode the video, re-encode a segment, process a
 
 No ArtWorks generation request was made while preparing this document.
 
-## Updated recommendation
+## Decision
 
 **Do not ship FFmpeg or ffmpeg.wasm for Chain mode.**
 
-The preferred implementation candidate is now **Mediabunny**, with MP4Box.js + direct WebCodecs kept as a lower-level fallback/debug path.
+The preferred implementation candidate is **Mediabunny**, with MP4Box.js + direct WebCodecs retained as a lower-level fallback/debug path.
 
 Preferred architecture:
 
@@ -24,13 +24,14 @@ ArtWorks MP4 result URL
     |
     v
 Mediabunny UrlSource
-    |-- optimized remote byte reads / prefetch
-    |-- custom fetch RequestInit when needed
+    |-- lazy remote reads / prefetch
+    |-- bounded cache
+    |-- bounded application retry policy
     |
     v
-Mediabunny Input + MP4 parser
+Mediabunny Input({ formats: [MP4] })
+    |-- MP4 parser only
     |-- track / codec / dimensions / duration
-    |-- packet timing and statistics
     |
     v
 InputVideoTrack.canDecode()
@@ -41,7 +42,7 @@ VideoSampleSink.getSample(Infinity)
     |-- presentation-order final frame
     |
     v
-VideoSample / Canvas
+VideoSample.draw(canvas)
     |
     v
 JPEG/PNG Blob
@@ -52,217 +53,224 @@ next ArtWorks task
 
 No `VideoEncoder`, audio decoder/encoder, output muxer, ffmpeg.wasm, or complete-video transcode is required.
 
-## Why Mediabunny is a strong fit
+## Why Mediabunny fits this exact problem
 
-Mediabunny is a pure-TypeScript browser media toolkit with zero dependencies. It combines container demuxing with abstractions over browser WebCodecs decoders and is designed for lazy/streamed media access.
+The reviewed Mediabunny guide describes a pure-TypeScript, zero-dependency, tree-shakable media toolkit that combines demuxing with higher-level WebCodecs integration.
 
-For this project it removes several pieces of application-owned media plumbing that the MP4Box.js + raw WebCodecs design would otherwise require.
+For Chain it removes application-owned responsibilities that MP4Box.js + raw WebCodecs would otherwise require.
 
 Relevant documented capabilities include:
 
 - MP4/ISOBMFF input support;
-- `UrlSource` for remote media with optimized reading and prefetch behavior;
-- `UrlSourceOptions.requestInit` for normal Fetch API options/custom headers;
-- `InputVideoTrack.canDecode()` to test whether the browser can decode the actual track;
+- lazy, partial file reads rather than mandatory full-file buffering;
+- `UrlSource` for remote media with network-oriented prefetching;
+- configurable source cache size;
+- custom `RequestInit`, retry behavior and `fetchFn`;
+- `InputVideoTrack.canDecode()` for the actual browser/device and codec configuration;
 - codec and full codec-parameter strings;
+- decoder configuration extraction;
 - coded/display dimensions and rotation;
-- duration and timing information;
-- packet statistics including packet count, average packet rate/FPS, and average bitrate;
-- `VideoSampleSink` for decoded video frames;
-- presentation-order frame retrieval;
-- direct last-frame retrieval through `VideoSampleSink.getSample(Infinity)`;
-- `VideoSample` conversion/drawing to canvas-compatible image sources.
+- duration, first timestamp and time-resolution information;
+- packet statistics including packet count, average packet rate/FPS and average bitrate;
+- `VideoSampleSink` for decoded frames;
+- presentation-order sample semantics;
+- explicit final-frame retrieval via `VideoSampleSink.getSample(Infinity)`;
+- `VideoSample.draw()` with rotation-aware canvas drawing;
+- explicit `VideoSample.close()` and `Input.dispose()` resource cleanup.
 
-The `getSample(Infinity)` behavior is especially valuable: the library defines `getSample(timestamp)` as returning the last sample in **presentation order** at or before the requested timestamp. Passing `Infinity` is explicitly documented as the way to retrieve the last sample.
-
-That means the application does not need to manually:
-
-- find the final presentation sample;
-- find the preceding H.264 sync sample;
-- construct `EncodedVideoChunk` objects;
-- manage decode order versus presentation order;
-- feed and flush `VideoDecoder` itself.
-
-Those responsibilities are still present internally, but they move into a media library whose API is designed around exactly this operation.
+The `getSample(Infinity)` contract is especially valuable. The guide states that `VideoSampleSink` operates in presentation order and documents `getSample(Infinity)` as the way to extract the last sample. This avoids application-owned B-frame/decode-order bookkeeping.
 
 ## Minimal target algorithm
 
-The intended Chain transition can be approximately:
+Architecture-level pseudocode:
 
 ```js
+const source = new UrlSource(videoUrl, {
+  maxCacheSize: 8 * 1024 * 1024,
+  getRetryDelay: previousAttempts => {
+    if (previousAttempts >= 3) return null;
+    return Math.min(2 ** previousAttempts, 8);
+  },
+});
+
 const input = new Input({
-  source: new UrlSource(videoUrl),
+  source,
   formats: [MP4],
 });
 
-const track = await input.getPrimaryVideoTrack();
-if (!track || !(await track.canDecode())) {
-  throw new Error('Result video is not decodable on this device.');
+let sample;
+try {
+  const track = await input.getPrimaryVideoTrack();
+  if (!track || !(await track.canDecode())) {
+    throw new Error('Result video is not decodable on this device.');
+  }
+
+  const sink = new VideoSampleSink(track);
+  sample = await sink.getSample(Infinity);
+  if (!sample) {
+    throw new Error('No final video frame was found.');
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = sample.displayWidth;
+  canvas.height = sample.displayHeight;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+
+  sample.draw(ctx, 0, 0);
+
+  const transitionBlob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => blob ? resolve(blob) : reject(new Error('Frame export failed.')),
+      'image/jpeg',
+      0.95,
+    );
+  });
+
+  // Persist transition-image state before the next billable POST.
+} finally {
+  sample?.close();
+  input.dispose();
 }
-
-const sink = new VideoSampleSink(track);
-const sample = await sink.getSample(Infinity);
-if (!sample) {
-  throw new Error('No final video frame was found.');
-}
-
-const canvas = document.createElement('canvas');
-canvas.width = sample.displayWidth;
-canvas.height = sample.displayHeight;
-const ctx = canvas.getContext('2d');
-sample.draw(ctx, 0, 0);
-
-const transitionBlob = await new Promise((resolve, reject) => {
-  canvas.toBlob(
-    blob => blob ? resolve(blob) : reject(new Error('Frame export failed.')),
-    'image/jpeg',
-    0.95,
-  );
-});
-
-sample.close();
-input.dispose();
 ```
 
-This is architecture-level pseudocode, not yet validated project runtime code. Exact imports/API details must follow the pinned Mediabunny version chosen during implementation.
+This is not yet project runtime code. Exact imports and APIs must be verified against the pinned Mediabunny version chosen during implementation.
 
-## Network efficiency
+## Important implementation rules from the full guide
 
-Mediabunny's `UrlSource` is specifically intended for remote media and uses optimized reading/prefetch patterns rather than requiring the application to fetch the full MP4 into an `ArrayBuffer` first.
+### Import only MP4 support
 
-That aligns well with the mobile constraint: Chain only needs enough of the file to parse the MP4 and decode the final frame dependency region.
+Use:
 
-The exact byte traffic depends on:
+```js
+formats: [MP4]
+```
 
-- MP4 layout (`moov` placement);
-- final GOP length;
-- server Range behavior;
-- Mediabunny's selected prefetch/cache configuration.
+Do **not** use `ALL_FORMATS` for the production Chain path.
 
-Measure actual network reads on a representative ArtWorks result before claiming a particular byte saving.
+The guide explicitly states that `ALL_FORMATS` pulls in all demuxers and can significantly increase bundle size. ArtWorks results are expected to be MP4, so unrelated input formats should be tree-shaken out.
 
-## CORS remains the controlling provider constraint
+If later provider evidence shows another container format, add that format explicitly rather than switching to `ALL_FORMATS` by default.
+
+### Override the default UrlSource retry policy
+
+Mediabunny's documented `UrlSource` default uses infinite exponential backoff capped at 16 seconds, except when it suspects a cross-origin CORS failure.
+
+That default conflicts with this project's bounded-retry discipline.
+
+Therefore the PWA must provide its own `getRetryDelay` with a finite retry budget. Retry state relevant to recovery should still be represented in the durable task ledger rather than hidden indefinitely inside a media library.
+
+### Keep network memory bounded
+
+`UrlSource` documents an 8 MiB default cache. This is compatible with the mobile-first design, but the value should be explicit or otherwise treated as a measured implementation parameter.
+
+The Chain path should not first download the full result into an `ArrayBuffer` merely to obtain one frame.
+
+Actual bytes read depend on:
+
+- MP4 metadata placement;
+- final decode dependency region/GOP;
+- provider HTTP behavior;
+- Mediabunny prefetch behavior;
+- cache size.
+
+Measure `source.onread` ranges in development against representative ArtWorks media. Do not log signed result URLs or other sensitive URL material.
+
+### Dispose resources deterministically
+
+The guide explicitly documents:
+
+- `VideoSample.close()` to release underlying frame/VRAM resources;
+- `Input.dispose()` to cancel outstanding reads, close decoders and dispose connected sink activity.
+
+Do not rely only on garbage collection on iPhone. Close the final sample promptly after drawing it and dispose the `Input` in a `finally` path.
+
+### Do not compute expensive media statistics in the Chain hot path
+
+`computePacketStats()` can provide packet count, average packet rate/FPS and bitrate, but the guide warns that it may require many reads and can take several hundred milliseconds depending on the file.
+
+Use it for diagnostics/evidence when needed, not as a prerequisite for extracting the final frame.
+
+A bounded sample count such as `computePacketStats(100)` is suitable for quick estimates but must be labeled as an estimate where applicable.
+
+## Presentation order and B-frames
+
+The final image must represent the final **displayed** frame, not simply the final encoded packet in file order.
+
+Mediabunny distinguishes presentation order from decode order. `VideoSampleSink` operations are documented as using presentation order, and `getSample(Infinity)` returns the last presented sample.
+
+This is a material advantage over implementing the decoder pipeline ourselves because the application does not need to manually:
+
+- find the final presentation sample;
+- locate the preceding H.264 key packet;
+- construct `EncodedVideoChunk` objects;
+- feed packets in decode order;
+- reorder decoded B-frames into presentation order;
+- manage decoder flush/reset semantics.
+
+MP4Box.js + direct WebCodecs remains useful if this abstraction ever needs to be debugged or verified at packet level.
+
+## CanvasSink alternative
+
+Mediabunny also exposes `CanvasSink`, whose retrieval methods are documented as analogous to `VideoSampleSink` and which handles scaling, rotation and cropping while producing canvas objects.
+
+For one final frame, either approach is reasonable:
+
+- `VideoSampleSink` + one application-owned canvas gives the clearest frame lifetime and explicit `sample.close()` control;
+- `CanvasSink` can further reduce glue code if its exact final-frame behavior in the pinned version is validated.
+
+Current preference remains `VideoSampleSink.getSample(Infinity)` because the guide explicitly shows that exact last-frame call.
+
+## Network and CORS boundary
 
 Mediabunny does not bypass browser security policy.
 
-Its documentation explicitly warns that cross-origin `UrlSource` usage requires CORS to be configured correctly.
+The guide explicitly warns that browser use of a cross-origin `UrlSource` requires proper CORS configuration.
 
 Validate against a real ArtWorks result URL:
 
-- cross-origin browser fetch access;
-- partial/range access used by the media reader;
-- media bytes readable by JavaScript;
-- actual H.264 track decodable through the target Safari/WebCodecs implementation;
-- final frame can be exported into a Blob suitable for the next request.
+- JavaScript can read the cross-origin response;
+- the provider supports the random/partial reads required by the remote source path;
+- any relevant response metadata is accessible;
+- the actual track is decodable on the target iPhone;
+- final-frame extraction completes without a full-file memory spike;
+- the exported image Blob is accepted by the next ArtWorks request.
+
+Do not assume HTTP Range support merely from the existence of `UrlSource`; measure the actual provider requests and responses.
 
 If result-media CORS fails, replacing MP4Box.js with Mediabunny does not solve that provider boundary.
 
-## Safari/iOS implications
+## Safari/iOS capability boundary
 
-Mediabunny relies on WebCodecs for browser-native codec decoding. Codec availability therefore remains dependent on the browser.
+Mediabunny relies on native WebCodecs for browser-supported codec decoding unless a custom decoder is registered.
 
-This is acceptable for the current known ArtWorks H.264/MP4 output target, subject to physical-device validation.
+Do not hard-code a Safari version assumption as the Chain gate.
 
-Use the library's own capability boundary:
+Use:
 
 ```text
 track.canDecode()
 ```
 
-before attempting Chain advancement.
+against the actual result track on the actual device.
 
-This is preferable to hard-coding a browser/version assumption.
-
-## Comparison with MP4Box.js + raw WebCodecs
-
-### Mediabunny
-
-Advantages for Img2Video:
-
-- one high-level library for MP4 parsing and decoded frame retrieval;
-- explicit `getSample(Infinity)` last-frame operation;
-- presentation-order semantics already handled;
-- WebCodecs integration already implemented;
-- optimized `UrlSource` network reads;
-- useful media metadata/statistics;
-- zero dependencies;
-- highly tree-shakable library architecture.
-
-Tradeoffs:
-
-- a larger abstraction surface than the minimal MP4Box parser;
-- a relatively substantial external media dependency that must be pinned and device-tested;
-- exact bundle size for the selected imports must be measured;
-- MPL-2.0 licensing obligations must be respected if the library source itself is modified and redistributed.
-
-### MP4Box.js + direct WebCodecs
-
-Advantages:
-
-- lower-level control over MP4 boxes, packets and exact decode pipeline;
-- useful as a diagnostic/fallback implementation if a Mediabunny behavior needs investigation;
-- separates demuxing from browser decoder behavior explicitly.
-
-Tradeoffs for this product:
-
-- application must implement the final-GOP selection/decode pipeline itself;
-- application owns more H.264/WebCodecs edge cases;
-- more code to test on iOS for no user-visible benefit if Mediabunny's final-sample API works correctly.
-
-### Recommendation
-
-Prototype **Mediabunny first**.
-
-Keep MP4Box.js + direct WebCodecs as the fallback/debug route, not the default production architecture.
-
-The simple `<video>` + canvas route remains a minimal compatibility experiment, but it provides less deterministic sample-level behavior than the media-toolkit path.
-
-## Dependency and security policy
-
-The PWA will handle user credentials, so do not import Mediabunny from a third-party CDN at runtime.
-
-If selected for production:
-
-- pin a specific reviewed Mediabunny version;
-- vendor the browser module/build under the repository-controlled `pwa/` tree;
-- serve it from the same GitHub Pages origin as the application;
-- include only required functionality where practical;
-- keep Content Security Policy restrictive and avoid unnecessary third-party runtime script origins;
-- preserve required MPL-2.0 notices/license obligations.
-
-The project advertises strong tree shaking and very small builds for small subsets, but the exact Img2Video subset (`Input`, MP4 input, `UrlSource`, video decoding and `VideoSampleSink`) must be built and measured before assigning a concrete bundle-size number.
-
-## Relation to the uploaded WebCodecs note
-
-The user-supplied `webcodecs.md` describes a valid broader pipeline for partial MP4 decoding and re-encoding.
-
-For Chain, its key insight remains correct: media decoding requires MP4-aware sample/configuration handling and keyframe dependencies.
-
-Mediabunny is potentially useful precisely because it already implements those responsibilities around WebCodecs.
-
-The following parts of the uploaded re-encoding pipeline remain unnecessary for Chain:
-
-```text
-VideoEncoder
-AudioDecoder
-AudioEncoder
-muxer
-segment output
-```
+No custom codec decoder is planned for H.264. If native decoding unexpectedly fails on the supported iPhone target, Chain should stop before submitting the next billable task and expose a clear incompatibility state.
 
 ## Media measurement boundary
 
-Mediabunny materially improves what the PWA can inspect compared with plain `<video>` metadata.
+Mediabunny materially improves what the PWA can inspect compared with a plain `<video>` element.
 
-Useful browser-visible data includes:
+Useful browser-visible data can include:
 
 - container/track identity;
 - codec and codec parameter string;
+- decoder configuration;
 - coded/display dimensions;
-- rotation/pixel aspect information;
-- duration;
+- rotation and color-space information;
+- duration and timestamps;
 - packet count;
-- average packet rate, which is useful as an average frame-rate measure;
+- average packet rate/FPS;
 - average bitrate;
 - packet/sample timestamps.
 
@@ -270,44 +278,111 @@ This does **not** eliminate the deliberate dual-runtime boundary.
 
 Keep:
 
-- **PWA + Mediabunny:** production orchestration, Chain final-frame extraction, lightweight media validation/inspection;
-- **Python + ffprobe/project probes:** authoritative provider discovery, detailed codec/container measurements, regression evidence, and investigation where exact ffprobe semantics are required.
+- **PWA + Mediabunny:** production orchestration, final-frame extraction and lightweight media validation needed by the product;
+- **Python + ffprobe/project probes:** authoritative provider discovery, detailed codec/container measurement, regression evidence and investigation where exact ffprobe semantics are required.
 
-The PWA should not be presented as a wholesale replacement for the diagnostic Python toolchain.
+The PWA is the production surface, not a wholesale replacement for the diagnostic Python toolchain.
+
+## Dependency and security policy
+
+The PWA handles user credentials, so do not import Mediabunny from a third-party CDN at runtime.
+
+If selected for production:
+
+- pin a reviewed Mediabunny version;
+- vendor the browser module/build under repository-controlled `pwa/` source;
+- serve it from the same GitHub Pages origin as the application;
+- import only the required MP4/read/decode symbols;
+- measure the resulting production bundle;
+- keep Content Security Policy restrictive;
+- preserve applicable MPL-2.0 notices/license obligations.
+
+The project documentation says Mediabunny is zero-dependency and highly tree-shakable. Do not assign a concrete bundle-size number until the exact Img2Video import set has been built and measured.
 
 ## Preflight/self-test before billable Chain work
 
-Before the first Chain task is submitted on a device, validate the media path with a local/non-billable fixture that matches ArtWorks H.264 MP4 output as closely as practical:
+Before the first Chain task is submitted on a device, validate the media path with a local/non-billable fixture matching ArtWorks H.264 MP4 output as closely as practical:
 
-1. construct a Mediabunny `Input` from the fixture;
-2. obtain its primary video track;
+1. create `Input` with `formats: [MP4]`;
+2. obtain the primary video track;
 3. verify `track.canDecode()`;
 4. call `VideoSampleSink.getSample(Infinity)`;
-5. render/export the returned final frame;
+5. draw/export the returned frame;
 6. verify the Blob is non-empty and has the expected image type/dimensions;
-7. dispose/close all media resources;
+7. close the sample and dispose the input;
 8. observe peak memory on the target iPhone.
 
-Separately, use an already-paid ArtWorks result URL to validate remote CORS/range behavior when one is available.
+Separately, use an already-paid ArtWorks result URL to validate remote CORS and actual partial-read behavior when one is available.
+
+## Comparison with alternatives
+
+### Mediabunny — preferred
+
+Advantages:
+
+- one high-level library for MP4 parsing and final-frame decode;
+- explicit presentation-order `getSample(Infinity)` operation;
+- WebCodecs integration already handled;
+- lazy remote reading and bounded source cache;
+- runtime decodability check;
+- useful media metadata/statistics;
+- zero dependencies and tree-shakable design.
+
+Tradeoffs:
+
+- substantial external library surface that must be pinned and device-tested;
+- exact production bundle size must be measured;
+- application must override its default unbounded remote retry behavior;
+- library lifecycle/resource semantics must be followed explicitly.
+
+### MP4Box.js + direct WebCodecs — fallback/debug
+
+Advantages:
+
+- lower-level MP4/packet control;
+- useful for verifying sample tables, key packets and decoder behavior;
+- separates demuxing from decoding explicitly.
+
+Tradeoffs:
+
+- substantially more application code;
+- application owns decode-order/presentation-order edge cases;
+- no user-visible benefit if Mediabunny's final-sample path works correctly.
+
+### `<video>` + canvas — minimal compatibility prototype
+
+Advantages:
+
+- smallest conceptual implementation;
+- useful as a quick browser/media-host compatibility check.
+
+Tradeoffs:
+
+- less deterministic sample-level behavior;
+- weaker inspection/control over final-frame selection.
+
+### ffmpeg.wasm — rejected for Chain
+
+Not justified for extracting one frame when lighter native/browser media paths exist.
 
 ## Current status
 
-**Mediabunny is now the preferred Chain implementation candidate; physical-device/provider validation is still required.**
+**Mediabunny remains the preferred Chain implementation candidate, now supported by the full guide rather than only selected API documentation. Physical-device/provider validation is still required.**
 
 Remaining Chain-specific validation:
 
-- ArtWorks result-media CORS and partial-read behavior;
-- real ArtWorks result parsing through Mediabunny;
+- ArtWorks result-media CORS;
+- actual remote partial-read/request behavior;
+- real ArtWorks MP4 parsing through the pinned Mediabunny build;
 - `InputVideoTrack.canDecode()` on target iPhone/iOS;
 - `VideoSampleSink.getSample(Infinity)` returns the expected true final displayed frame on representative Wan/LTX outputs;
-- final canvas/JPEG Blob is accepted as the next ArtWorks image input;
-- actual network byte count and memory usage are acceptable;
-- selected vendored bundle size is acceptable.
+- final JPEG/PNG Blob is accepted as the next ArtWorks image input;
+- peak memory, network byte count and vendored bundle size are acceptable.
 
 ## Sources
 
 - User-supplied `webcodecs.md`, reviewed 2026-08-07.
-- Mediabunny official documentation and API reference, reviewed 2026-08-07: Input, MP4 support, UrlSource, InputVideoTrack, VideoSampleSink, VideoSample, PacketStats, supported formats/codecs, installation and licensing.
-- Mediabunny GitHub repository, reviewed 2026-08-07.
+- User-supplied full Mediabunny guide (`mediabunny-full-guide.md`), reviewed 2026-08-07: introduction, installation, reading media files, input formats, media sinks, packets/samples, supported formats/codecs, conversion and output documentation.
+- Mediabunny official documentation/API concepts represented in that supplied guide.
 - GPAC MP4Box.js documentation, retained as the lower-level fallback/reference.
-- WebKit Safari/WebCodecs release notes.
+- WebKit Safari/WebCodecs documentation retained for platform-level validation.
