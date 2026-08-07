@@ -1,4 +1,4 @@
-<!-- VERSION$00004$ | Edited: 07/08 | TIME: 18:57 -->
+<!-- VERSION$00005$ | Edited: 07/08 | TIME: 19:01 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -21,6 +21,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`discovery.md`](discovery.md) — current findings, verified repository constraints, and unresolved questions.
 - [`security-and-api-architecture.md`](security-and-api-architecture.md) — selected device-local/user-owned credential model, Password AutoFill preference, threat model, CSP direction, and browser/API constraints.
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
+- [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
 ## Current direction
@@ -30,6 +31,33 @@ The target is an installable PWA hosted by GitHub Pages under a dedicated path, 
 Future PWA runtime source belongs in repository-root `pwa/`; the existing Safari/Shortcut/Python implementation remains untouched during discovery and early PWA development.
 
 The application does not need functional offline generation because ArtWorks requires network access. It should still show clear network/offline state and preserve all remote task IDs so interrupted work can be reconciled when connectivity/application execution returns.
+
+## Python/PWA runtime relationship
+
+The current parity analysis finds that most of the Python client's **orchestration logic** can be reproduced directly in a PWA:
+
+- request validation;
+- task submission;
+- immediate task-ID persistence;
+- status polling and bounded retries;
+- terminal-state/error handling;
+- parallel execution;
+- cancellation and priority operations;
+- detailed task/run history;
+- per-phase timing;
+- download state;
+- prompt-set reuse;
+- interruption recovery without duplicate submissions.
+
+The largest difference is lifecycle, not API capability.
+
+The Python/a-Shell process attempts to keep polling continuously, while the PWA must assume iOS can suspend it outside the foreground. The remote ArtWorks task continues independently. When the PWA becomes active again it loads IndexedDB, queries existing task IDs, and resumes from the authoritative remote state.
+
+In that sense, the Python client's recovery model becomes the PWA's normal execution model.
+
+Chain mode remains feasible in principle but requires validation of browser-native final-frame extraction from the previous result. The current candidate uses an `HTMLVideoElement`, `requestVideoFrameCallback()`, canvas extraction, and a Blob rather than FFmpeg.
+
+The PWA intentionally does not reproduce shell execution or FFmpeg video concatenation; every ArtWorks output remains independent.
 
 The current background-execution recommendation is foreground-first orchestration with durable IndexedDB recovery. A Service Worker must not be treated as a persistent poller. It becomes useful when a concrete event-driven feature such as Web Push is implemented.
 
