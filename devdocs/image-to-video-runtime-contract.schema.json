@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pworksiphone:artworks:image-to-video-runtime-contract:2",
+  "title": "pworksIphone ArtWorks.ai Image-to-Video Derived Runtime Contract",
+  "description": "Project-derived production request contract for ArtWorks.ai PaaS v3 image-to-video tasks. This is not the provider OpenAPI document.",
+  "type": "object",
+  "required": [
+    "type",
+    "priority",
+    "payload"
+  ],
+  "properties": {
+    "type": {
+      "const": "image-to-video",
+      "description": "Documented task type for this operation."
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Documented queue priority. Lower values mean higher priority. The deprecated isFast field is intentionally excluded."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional documented task categorization tags."
+    },
+    "batchId": {
+      "type": "string",
+      "description": "Optional documented batch identifier."
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "image",
+        "prompt",
+        "model",
+        "fps",
+        "numFrames",
+        "resolution",
+        "performance",
+        "applyOptimizations",
+        "applyInterpolation",
+        "loras"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Production policy requires a real image reference. The provider schema documents Base64/data references or HTTPS URLs and marks the field required despite also marking it nullable."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Documented required generation prompt."
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "wan-2.2",
+            "ltx-2.3"
+          ],
+          "description": "Must be explicit. The project does not rely on the provider's documented default."
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 24,
+          "description": "Generation request FPS. Model-specific maxima are enforced below. This is distinct from native/output FPS and interpolationFps."
+        },
+        "numFrames": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 361,
+          "description": "Requested frame count. Model-specific maxima are enforced below. Accepted counts may be normalized in completed media."
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "480p",
+            "720p",
+            "1080p"
+          ],
+          "description": "Currently documented and runtime-confirmed ArtWorks image-to-video resolutions."
+        },
+        "performance": {
+          "type": "string",
+          "enum": [
+            "speed",
+            "quality",
+            "express"
+          ],
+          "description": "Documented and runtime-confirmed performance enum. The project requires an explicit value."
+        },
+        "applyOptimizations": {
+          "type": "boolean",
+          "description": "Explicit project request switch. Runtime effect remains unmeasured."
+        },
+        "applyInterpolation": {
+          "type": "boolean",
+          "description": "Documented boolean switch controlling whether interpolation is requested."
+        },
+        "interpolationFps": {
+          "type": "integer",
+          "format": "int32",
+          "default": 24,
+          "enum": [
+            24,
+            25,
+            30,
+            50,
+            60
+          ],
+          "description": "Documented interpolation target FPS. This is separate from generation request fps and from native/non-interpolated encoded FPS. Runtime support inside the documented enum has conflicting path-specific evidence."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Documented signed 64-bit integer field. No provider minimum/maximum or reproducibility guarantee is asserted here."
+        },
+        "loras": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lora"
+          },
+          "description": "Documented LoRA list. Cross-model compatibility remains unresolved."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "model": {
+                "const": "wan-2.2"
+              }
+            },
+            "required": [
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "fps": {
+                "maximum": 16
+              },
+              "numFrames": {
+                "maximum": 160
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "model": {
+                "const": "ltx-2.3"
+              }
+            },
+            "required": [
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "fps": {
+                "maximum": 24
+              },
+              "numFrames": {
+                "maximum": 361
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "applyInterpolation": {
+                "const": false
+              }
+            },
+            "required": [
+              "applyInterpolation"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "not": {
+              "required": [
+                "interpolationFps"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "applyInterpolation": {
+                "const": true
+              }
+            },
+            "required": [
+              "applyInterpolation"
+            ]
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "interpolationFps"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "lora": {
+      "type": "object",
+      "required": [
+        "modelName"
+      ],
+      "properties": {
+        "modelName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2,
+          "default": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-project-contract": {
+    "status": "derived",
+    "officialProviderSchema": false,
+    "taskType": "image-to-video",
+    "fpsConcepts": {
+      "requestFps": "payload.fps; model-specific generation request range",
+      "nativeOutputFps": "measured media property; not an interpolation constraint",
+      "interpolationFps": "separate documented target enum 24|25|30|50|60"
+    },
+    "interpolationEvidence": "Historical interpolationFps=30 late failure and user-reported working Wan 30 are conflicting path-specific evidence; neither is promoted to a universal hard constraint.",
+    "evidencePolicy": "Hard validation encodes documented provider constraints, confirmed runtime constraints, and explicit project safety policy. Conflicting, inferred, and user-reported behavior is intentionally not promoted into universal validation rules.",
+    "sources": [
+      "../AGENTS.md",
+      "api.md"
+    ]
+  }
+}

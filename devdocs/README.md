@@ -1,4 +1,4 @@
-<!-- VERSION$00040$ | Edited: 07/08 | TIME: 05:57 -->
+<!-- VERSION$00048$ | Edited: 07/08 | TIME: 07:21 -->
 # Developer Documentation
 
 `devdocs/` contains the durable technical documentation and reference material for pworksIphone. Runtime code and reusable tools live elsewhere in the repository.
@@ -9,6 +9,8 @@
 devdocs/
 ├── README.md
 ├── api.md
+├── derived-runtime-contract.md
+├── image-to-video-runtime-contract.schema.json
 ├── shortcut/
 │   ├── README.md
 │   ├── annotated-en.html
@@ -28,6 +30,18 @@ API findings must retain their evidence level:
 - **Confirmed** — observed in an API response or measured from completed output media.
 - **Inferred** — consistent with current evidence but not exhaustively verified.
 - **User-reported** — manually observed but not yet reproduced by saved automated evidence.
+
+The API documentation keeps three FPS concepts separate: generation request `fps`, native/non-interpolated encoded FPS measured from media, and the separate `interpolationFps` target controlled by the boolean `applyInterpolation`. Native output FPS must not be reused as an interpolation constraint.
+
+## Derived runtime contract
+
+[`image-to-video-runtime-contract.schema.json`](image-to-video-runtime-contract.schema.json) is the machine-readable JSON Schema used to express the project's derived production request contract for ArtWorks.ai `image-to-video` tasks.
+
+[`derived-runtime-contract.md`](derived-runtime-contract.md) explains why that contract is separate from the provider OpenAPI document, which evidence levels may become hard validation rules, how known Swagger/runtime mismatches are represented, and how the derived contract should be refreshed.
+
+The derived schema is **not** an official ArtWorks OpenAPI document and must not be edited or described as though it were one. It follows the documented interpolation target enum `24 | 25 | 30 | 50 | 60`, keeps `applyInterpolation` boolean, and does not promote conflicting executor observations into a universal model-specific interpolation rule.
+
+Because the contract is strict JSON, it intentionally has no line-1 VERSION comment; adding one would invalidate JSON.
 
 ## `shortcut/`
 
