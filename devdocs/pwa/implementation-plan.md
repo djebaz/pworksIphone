@@ -1,4 +1,4 @@
-<!-- VERSION$00003$ | Edited: 07/08 | TIME: 20:08 -->
+<!-- VERSION$00004$ | Edited: 07/08 | TIME: 20:42 -->
 # PWA Implementation Plan
 
 ## Purpose
@@ -67,18 +67,42 @@ Also verify browser access for the known-ID status/cancel/priority operations as
 
 No generation request is required for this gate.
 
-### Gate 0B — result-media JavaScript access
+### Gate 0B — result-media JavaScript access and real Range behavior
 
 Using an already-paid completed task/result if available, test the media URL separately from the API host.
 
 Verify:
 
 - JavaScript `fetch()` access under CORS;
-- partial/random reads needed by the media reader;
 - media bytes are readable by the PWA;
-- relevant response headers are exposed if the implementation relies on them.
+- relevant response headers are exposed if the implementation relies on them;
+- the optimized random-access path is tested with an actual Range request, not inferred only from `Accept-Ranges`.
+
+Use the stronger capability probe learned from the inspected `StreamsDL` implementation:
+
+```text
+GET <result-url>
+Range: bytes=0-0
+```
+
+A positive optimized-Range result is:
+
+```text
+206 Partial Content
+Content-Range: bytes 0-0/<total>
+```
+
+Rules:
+
+- absence of `Accept-Ranges` alone is not enough to declare Range unsupported;
+- a real `206` response can establish Range support even when HEAD omitted `Accept-Ranges`;
+- a `200` full response to the Range request must **not** be classified as proven random-access support because the host may simply be ignoring Range and returning the entire file;
+- record whether Mediabunny's reads remain partial or trigger a full-file fallback;
+- do not log signed result URLs or other sensitive URL material.
 
 This gate is distinct from whether `<video>` can simply play the URL. A browser may play cross-origin media that JavaScript cannot inspect.
+
+If CORS works but Range is ignored, Chain may still be functionally possible through a full-file path; that must be treated as a separate measured performance/memory outcome, not as equivalent to the preferred lazy random-access path.
 
 ### Gate 0C — origin trust and preview topology
 
@@ -115,6 +139,7 @@ All of the following must be known:
 - production origin is trusted for credentials;
 - ArtWorks API CORS either passes or the architecture has been redesigned;
 - result-media JavaScript access is viable for Chain or Chain is explicitly disabled;
+- result-media Range behavior is classified as real `206` random access, full-file fallback, or unavailable;
 - Password AutoFill remains the selected credential persistence model;
 - no undocumented provider feature is required for correctness.
 
@@ -185,7 +210,7 @@ remote-completed -> staged -> exported
 
 OPFS may be used as origin-private staging. Prefer streaming/bounded memory where practical. Reject obvious HTML/error payloads and non-video content types.
 
-User-visible Files/Photos/share/export behavior must be tested on the target iPhone.
+The inspected `StreamsDL` implementation reinforces that an internal/OPFS write is staging, not proof of completed user-visible delivery. User-visible Files/Photos/share/export behavior must be tested separately on the target iPhone.
 
 ### Stage 1 acceptance
 
@@ -261,10 +286,13 @@ ArtWorks result URL
 - close `VideoSample` promptly and dispose the `Input` after use;
 - keep packet-statistics scans out of the hot path unless needed for diagnostics.
 
-Fallback/debug paths:
+Fallback/debug/reference paths:
 
-1. MP4Box.js + direct WebCodecs;
-2. `<video>` + canvas as the simplest compatibility experiment.
+1. `<video>` + canvas as the simplest compatibility experiment;
+2. low-level MP4 + direct WebCodecs techniques already present in the owner's `mothanext` repository for packet/decode investigation;
+3. FFmpeg-WASM techniques from `StreamsDL` only if a later product requirement genuinely needs container repair, conversion, A/V muxing, clipping, or concatenation.
+
+The private reference implementations reduce implementation uncertainty but do not relax the PWA's CORS/origin constraints because extension host/offscreen/download privileges do not transfer to GitHub Pages.
 
 ### Chain suspension semantics
 
