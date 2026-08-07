@@ -1,4 +1,4 @@
-<!-- VERSION$00002$ | Edited: 05/08 | TIME: 23:34 -->
+<!-- VERSION$00046$ | Edited: 07/08 | TIME: 07:21 -->
 # ArtWorks.ai Image-to-Video API: Parameters, Features, and Runtime Behavior
 
 **Report date:** 2026-08-05  
@@ -34,10 +34,11 @@ This report combines four evidence levels:
      - explicit Wan output is always encoded at 16 FPS
      - omitting `model` appears to select another legacy/default path with 16 FPS and a 128-frame maximum
 
-5. **Deferred executor validation**
-   - two live failures on 2026-08-05 with `interpolationFps=30`
-   - the interpolation stage accepts only `None`, `16` or `24` and reports the
-     violation against `body.fps`
+5. **Interpolation evidence and executor mismatch**
+   - the authenticated OpenAPI schema documents `interpolationFps` values `24`, `25`, `30`, `50`, and `60`, with default `24`
+   - two live tasks on 2026-08-05 using `interpolationFps=30` failed late in one executor path with an internal `body.fps` error mentioning `None`, `16` or `24`
+   - the user has separately observed Wan interpolation at `30` working
+   - these are conflicting runtime observations; the internal `body.fps` error must not be reinterpreted as the public `interpolationFps` schema
 
 Items described as **documented** come from Swagger. Items described as **confirmed** come from API responses or completed media measurements. Items described as **inferred** need additional tests.
 
@@ -71,6 +72,12 @@ The request field `fps` should not currently be interpreted as the final MP4 fra
 - LTX accepted `fps=10` but encoded both measured outputs at 24 FPS.
 - Wan reportedly encodes at 16 FPS.
 - The request FPS may still affect internal generation or motion pacing; that has not yet been isolated.
+
+Keep three FPS concepts separate:
+
+1. `payload.fps` — generation request FPS, with model-specific request limits.
+2. Native/non-interpolated encoded FPS — a property measured from the produced media. Current project evidence associates Wan with 16 FPS (user-reported) and LTX with approximately 24 FPS in measured outputs.
+3. `interpolationFps` — a separate interpolation target. The authenticated OpenAPI schema documents `24`, `25`, `30`, `50`, and `60`; it is not derived from the model's native output FPS.
 
 For LTX, requested frame counts were normalized downward:
 
@@ -426,15 +433,18 @@ The schema and validation confirm accepted names, but the current probes do not 
 
 - Type: boolean
 - No Swagger default is stated.
-- Intended to control output interpolation.
+- Intended to enable or disable the interpolation stage.
 
-Actual behavior has not yet been measured.
+This field is a boolean switch and must remain conceptually separate from both `fps` and `interpolationFps`. Setting `applyInterpolation=true` enables interpolation; `interpolationFps` selects the interpolation target when supplied.
+
+The exact runtime effect remains incompletely characterized.
 
 ## 5.10 `interpolationFps`
 
 Swagger declares:
 
 - Type: integer
+- Format: `int32`
 - Default: 24
 - Enum:
 
@@ -446,11 +456,18 @@ Swagger declares:
 60
 ```
 
-Runtime anomaly:
+This field is a **separate interpolation target**. It is not the same as:
 
-The invalid-value probe sent `interpolationFps=999999999` with interpolation enabled for both explicit models. Both requests were unexpectedly accepted.
+- `payload.fps`, which is the generation request FPS; or
+- the native/non-interpolated encoded FPS measured from the output video.
 
-**Confirmed 2026-08-05:** validation is deferred to the interpolation executor, not skipped. A task submitted with `interpolationFps=30` (a declared enum value) was accepted, queued, entered `processing`, and then failed after approximately 71 seconds with:
+Therefore the observed native/output rates — approximately 16 FPS for Wan and 24 FPS for LTX — must not be turned into a model-specific interpolation mapping. In particular, `16` is not part of the authenticated OpenAPI `interpolationFps` enum.
+
+### Historical runtime evidence
+
+The invalid-value probe sent `interpolationFps=999999999` with interpolation enabled for both explicit models. Both requests were unexpectedly accepted at task creation, showing that this enum was not enforced by that creation path.
+
+On 2026-08-05, a task submitted with documented `interpolationFps=30` was accepted, queued, entered `processing`, and then failed after approximately 71 seconds with:
 
 ```json
 {"detail":[{"type":"literal_error","loc":["body","fps"],
@@ -458,30 +475,23 @@ The invalid-value probe sent `interpolationFps=999999999` with interpolation ena
   "ctx":{"expected":"None, 16 or 24"}}]}
 ```
 
-The effective accepted set is therefore:
+The error refers to an internal `body.fps` field, not directly to the public `interpolationFps` property. The earlier report generalized that internal error into an effective public set of `{16, 24}`. That conclusion is no longer justified.
 
-```text
-None | 16 | 24
-```
+The user has separately observed Wan interpolation at `30` working. The current evidence is therefore **conflicting and path-specific**:
 
-Consequences:
+- documented public target: `24 | 25 | 30 | 50 | 60`;
+- historical evidence: one executor path failed late at `30`;
+- user-reported evidence: Wan interpolation at `30` can work.
 
-- Of the five values declared in Swagger, only `24` is actually executable. `25`, `30`, `50` and `60` are accepted at creation and fail at execute.
-- `16` is executable but is **not** declared in the Swagger enum.
-- `None` is executable, so omitting the field entirely is the safest default.
-- This eliminates the earlier hypotheses that the field is ignored, normalized, or nonfunctional.
+Until a reproducible task fixture resolves the difference, do not claim that `30` universally succeeds or universally fails, and do not replace the provider enum with `{16, 24}`.
 
-The error names `body.fps`, not `body.interpolationFps`. This indicates that interpolation runs as a **separate internal task whose `fps` field receives the submitted `interpolationFps` value**. See section 8.4 for the consequence.
+Client-side policy for the derived contract:
 
-Operational warning:
-
-An unsupported `interpolationFps` is not rejected at submission. It creates a task that queues, occupies the executor and fails late, with the associated billing and latency cost. Validate this field client-side before submitting.
-
-Client-side rule:
-
-- omit `interpolationFps` when `applyInterpolation` is `false`
-- otherwise send `16` for `wan-2.2` and `24` for `ltx-2.3`
-- correct any other value locally rather than letting the API consume it
+- `applyInterpolation` must be boolean;
+- omit `interpolationFps` when `applyInterpolation` is `false`;
+- when interpolation is enabled, validate the target against the documented enum `24 | 25 | 30 | 50 | 60`;
+- do not choose `interpolationFps` from the native/output FPS of the selected model;
+- treat live interpolation tests as potentially billable and record task IDs and final media metadata.
 
 ## 5.11 `seed`
 
@@ -595,30 +605,25 @@ User observation indicates omitted model uses another path:
 
 This needs a dedicated omitted-model timing and limit probe.
 
-### 8.3 The `interpolationFps` enum is both wrong and unenforced at creation
+### 8.3 `interpolationFps` creation validation and executor behavior differ
 
-Two independent defects:
+The public OpenAPI contract documents:
 
-1. **Unenforced at creation.** `999999999` and `30` were both accepted by `POST /api/v3/tasks`.
-2. **Incorrect as documented.** The executor accepts only `None`, `16` or `24`. Four of the five documented values cannot execute, and the executable value `16` is undocumented.
+```text
+24 | 25 | 30 | 50 | 60
+```
 
-The practical effect is a deferred, billable failure rather than a rejected request.
+Creation-time validation did not reject `999999999` or `30` in the observed probe path. A historical `30` task then failed late with an internal `body.fps` validator expecting `None`, `16` or `24`.
 
-### 8.4 Request FPS differs from encoded FPS
+That internal failure is evidence about one downstream executor path, not proof that the public `interpolationFps` enum is `{16, 24}`. The user has separately observed working Wan interpolation at `30`, so runtime support is currently model/path dependent or otherwise unresolved.
 
-LTX accepted `fps=10` but encoded at 24 FPS.
+### 8.4 Request FPS, native/output FPS, and interpolation FPS are distinct
 
-**Open hypothesis (2026-08-05):** the fixed encoded rates may belong to the interpolation/post stage rather than to the models themselves.
+LTX accepted `fps=10` but encoded measured output at approximately 24 FPS. Wan output is user-reported at 16 FPS without interpolation.
 
-Evidence:
+Those native/output rates must not be confused with `interpolationFps`. Interpolation is a separate post-processing request controlled by the boolean `applyInterpolation` and, when targeted explicitly, the documented `interpolationFps` enum. Using the model's existing output rate as the interpolation target would not represent temporal upsampling.
 
-- The interpolation executor accepts exactly `{16, 24}`.
-- The observed fixed encoded rates are exactly 16 for Wan and 24 for LTX.
-- The rejection surfaced on `body.fps`, implying the post stage is itself an `fps`-parameterized task.
-
-If correct, "Wan is always 16 FPS" and "LTX is always 24 FPS" would be restatements of the post stage's two permitted rates, and disabling interpolation might allow the encoded rate to follow the requested `fps`.
-
-This is **inferred**, not confirmed. The decisive test is cheap: measure a completed run with `applyInterpolation=false` and compare the encoded rate against the requested `fps`. If they match, conclusions 5, 6 and 7 in section 12 require revision.
+The previous hypothesis that the fixed 16/24 output rates necessarily originated in the interpolation stage is withdrawn. A future focused reproduction should instead determine why one `30` execution path failed while Wan interpolation at `30` has also been observed working.
 
 ### 8.5 Requested frame count differs from encoded frame count
 
@@ -646,7 +651,6 @@ These profiles minimize ambiguity based on current evidence.
     "performance": "speed",
     "applyOptimizations": false,
     "applyInterpolation": false,
-    "interpolationFps": 24,
     "loras": []
   }
 }
@@ -674,7 +678,6 @@ Expected request limits:
     "performance": "speed",
     "applyOptimizations": false,
     "applyInterpolation": false,
-    "interpolationFps": 24,
     "loras": []
   }
 }
@@ -769,13 +772,12 @@ The highest-value unresolved tests are:
    - complete a timing run
    - compare codec, dimensions, frame rate and duration against explicit Wan
 
-5. **Interpolation** (highest value, lowest cost)
-   - identical source task with interpolation off and on
-   - use `24`, then `16`; do **not** probe 25, 50 or 60, which are guaranteed
-     late executor failures and are billed like any other launched task
-   - measure frame rate, frame count and duration in each case
-   - primary question: with interpolation off, does the encoded rate follow the
-     requested `fps` instead of the model-fixed 16/24? See section 8.4.
+5. **Interpolation evidence reconciliation**
+   - reproduce the user-reported working Wan `interpolationFps=30` case with the exact model, request parameters, and executor path recorded
+   - compare it with the saved 2026-08-05 late failure at `30`
+   - keep `applyInterpolation` as a boolean and `interpolationFps` as a separate documented target
+   - use focused, explicitly opted-in tests rather than a full target matrix because interpolation tasks may be billable
+   - measure final frame rate, frame count, duration, dimensions, and codec for any completed interpolation run
 
 6. **Resolution dimensions**
    - complete 480p, 720p and 1080p runs for landscape and portrait inputs
@@ -807,5 +809,5 @@ The highest-value unresolved tests are:
 6. For measured LTX output, use 24 FPS and the actual encoded frame count.
 7. Expect LTX frame-count normalization to an apparent `8n + 1` lattice.
 8. Use `priority`, not deprecated `isFast`.
-9. Omit `interpolationFps` unless interpolating; `None` is explicitly accepted. When interpolating, send only 16 or 24, matched to the model. Unsupported values are not rejected at submission: they fail late, after the task has queued and run.
+9. Treat `applyInterpolation` as a boolean and `interpolationFps` as a separate interpolation target. Omit `interpolationFps` when interpolation is disabled; when enabled, use the documented `24 | 25 | 30 | 50 | 60` enum. Do not map Wan/LTX native output FPS to interpolation targets. Runtime support within that documented enum is not yet fully characterized because the historical `30` failure conflicts with a user-reported working Wan `30` case.
 10. Inspect every completed MP4 with `ffprobe` when exact duration, dimensions or frame count matter.
