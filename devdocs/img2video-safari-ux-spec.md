@@ -1,17 +1,17 @@
-<!-- VERSION$00067$ | Edited: 07/08 | TIME: 10:42 -->
+<!-- VERSION$00090$ | Edited: 07/08 | TIME: 14:24 -->
 # Img2Video Safari UX Spec
 
-Canonical UX specification for `shortcuts/img2video/index.html`, the Safari-facing launcher that hands a `{filename, cmd}` payload to the `Run Img2Video in a-Shell` Shortcut. This document describes the current, shipped behavior; if the UI and this spec ever disagree, treat the UI as a bug against this spec (or file a spec update alongside the fix) rather than assuming either side is silently authoritative.
+Canonical UX specification for `shortcuts/img2video/index.html`, the Safari-facing launcher that hands a `{filename, cmd}` payload to the `Run Img2Video in a-Shell` Shortcut.
 
-This is a feature-completion spec, not a redesign brief. The synthwave palette, glassy `.card` panels, compact mobile spacing, segmented controls, amber toggle styling, and sticky footer CTA defined inline in `index.html` are the production stylesheet and are not touched by this document. `devdocs/references/styles.css` is reference material from an unrelated project and is not the production stylesheet.
+This is a feature-completion spec, not a redesign brief. The existing synthwave palette, card surfaces, borders, typography, compact spacing, control sizes, iPhone-first layout, and sticky launch footer are the production visual system. Changes in this revision must reuse those primitives rather than introduce a broad redesign or global resizing pass.
 
 ## Overview
 
-The page is a single scrollable form (`#form`) inside `<main>`, followed by a fixed `<footer>` launch bar. Every field's live value is combined into one shell command line, previewed at the bottom of the form, and shipped to the Shortcut as JSON via a `shortcuts://run-shortcut` URL on submit.
+The page is a single scrollable form (`#form`) inside `<main>`, followed by a fixed `<footer>` launch bar. Live form state becomes one shell command line and is handed to the Shortcut through a `shortcuts://run-shortcut` URL.
 
 ## Section layout
 
-Sections appear in this fixed order and must not be reordered:
+Sections remain in this fixed order:
 
 1. Preset
 2. Source
@@ -24,101 +24,145 @@ Sections appear in this fixed order and must not be reordered:
 
 ## Preset behavior
 
-- The preset dropdown is populated from `presets.txt` (see `img2video-presets-settings-contract.md`), fetched at load time.
-- Selecting a preset applies only the nine generation/processing fields (`model`, `resolution`, `performance`, `fps`, `frames`, `priority`, `optimizations`, `interpolation`, `interpolationFps`). It never touches the source image, filename, motion prompts, generation mode, combine-videos, max-parallel-tasks, or play-on-finish.
-- "Custom" is a derived label, not a stored entry: whenever the current generation/processing fields don't exactly match any loaded preset, the dropdown shows "Custom" and the helper text reads "No preset matches current settings". There is no UI to create, save, rename, or delete a preset.
-- "Import settings.txt" reads a local `key=value` file and applies only the same nine generation/processing keys it recognizes (see the settings contract doc for the exact key list). It does not import prompts, execution settings, or motion/multi-prompt fields, even though those keys exist in the real `artworks_settings.txt` consumed directly by the Python client.
+- The preset dropdown is populated from `presets.txt`, fetched at load time.
+- Selecting a preset applies only the existing nine compact preset fields: `model`, `resolution`, `performance`, `fps`, `frames`, `priority`, `optimizations`, `interpolation`, `interpolationFps`.
+- Seed is not part of the compact preset schema or preset matching. It is a separate per-run Generation value.
+- `Custom` is a derived display label only. It appears when no loaded preset exactly matches the current compact preset fields, but it is not a selectable dropdown item.
+- There is no create/save/rename/delete preset UI.
+- `Import settings.txt` may also import `seed`, but still does not import prompts, source selection, generation mode, combine-videos, max-parallel-tasks, playback preference, or output paths.
 
 ## Source behavior
 
-- `Choose image` opens a native file picker; the selected file's name is written into the filename field and only the filename (never image bytes or a full path) is sent onward — the Shortcut resolves the file in Files, then Photos.
+- `Choose image` opens a native file picker; only the selected filename is handed onward.
 - Once a filename is present, the button label switches to `Change image`.
-- Editing the filename field directly clears any live image preview (since the preview can no longer be trusted to match).
+- Editing the filename field directly clears any live preview that can no longer be trusted to match.
 
 ## Motion / multi-prompt model
 
-Motion replaces the old single-prompt textarea with an ordered list of prompt blocks, matching the Python client's `--prompt` (repeatable) and prompt-order-is-execution-order semantics.
+Motion is an ordered list of prompt blocks matching the Python client's repeatable `--prompt` semantics.
 
-- The section header shows a live count: "N prompt" / "N prompts".
-- Each prompt block has a label (`Prompt 1`, `Prompt 2`, ...), a textarea, and three explicit action buttons: `↑ Move up`, `↓ Move down`, `✕ Delete`.
-- `Move up` is disabled on the first prompt; `Move down` is disabled on the last; `Delete` is disabled whenever exactly one prompt remains — at least one prompt must always exist.
-- `+ Add prompt` appends a new, empty prompt block and focuses its textarea.
-- Reordering (`Move up` / `Move down`) changes the actual array order used to build the command, which is also the execution/assembly order sent to the Python client.
-- On first load or after Reset, there is exactly one prompt, seeded with the default motion prompt (`Static camera, subtle natural movement.`).
+- The section header shows `N prompt` / `N prompts`.
+- Each prompt has Move up, Move down, and Delete actions.
+- At least one prompt always remains.
+- `+ Add prompt` appends and focuses a new prompt.
+- Reordering changes execution and assembly order.
+- Reset returns to one default prompt: `Static camera, subtle natural movement.`
 
 ### Generation mode (Chain / Parallel)
 
-- Hidden when there is exactly one prompt.
-- Shown as a two-way segmented control once there are 2+ prompts.
-- **Chain**: each prompt starts from the final frame of the previous generated result (`--mode chain`).
-- **Parallel**: each prompt starts independently from the original source image (`--mode parallel`).
-- Default: Chain, matching the Python client's own default when `generationMode` is unset.
+- Hidden with one prompt; visible with 2+ prompts.
+- Chain → `--mode chain`.
+- Parallel → `--mode parallel`.
+- Default: Chain.
 
 ### Combine videos
 
-- Hidden when there is exactly one prompt.
-- Shown as a toggle once there are 2+ prompts, directly below Generation mode.
-- ON assembles the generated results into one sequence in prompt order (`--combine-videos`); OFF keeps the outputs as separate files (`--no-combine-videos`).
+- Hidden with one prompt; visible with 2+ prompts.
+- ON → `--combine-videos`; OFF → `--no-combine-videos`.
 - Default: ON.
 
 ### Max parallel tasks
 
-- Shown only when there are 2+ prompts **and** Generation mode is Parallel; hidden in every other state, including Chain mode with 2+ prompts.
-- A range + numeric field, styled like the Request FPS / Requested frames / Queue priority controls, bounded 1–6 (`--max-parallel-tasks`).
-- Default: 6, matching the tracked example settings file (`app/artworks_settings.example.txt`); the bare Python client falls back to 3 only when no settings file supplies a value at all.
+- Visible only with 2+ prompts in Parallel mode.
+- Range + number control, 1–6.
+- Default: 6.
 
 ## Generation controls
 
-Unchanged from the prior UI: Model, Resolution, Performance segmented controls; Request FPS, Requested frames, Queue priority range fields. FPS/frames bounds and their live range hints update automatically when the model changes (`applyModelLimits`), because Wan and LTX have different validated request ranges.
+Generation contains:
+
+- Model
+- Resolution
+- Performance
+- Request FPS
+- Requested frames
+- **Seed**
+- Queue priority
+
+FPS/frame limits remain model-specific and use the existing range/number controls.
+
+### Seed
+
+- Default Seed value is `42`.
+- Explicit Seed is enabled by default.
+- The Seed value is stored as text so the UI can preserve the Python client's full signed 64-bit integer range without JavaScript `Number` precision loss.
+- When explicit Seed is enabled, the value must be a valid signed 64-bit integer and Safari emits `--seed <value>`.
+- **No CLI seed** is the explicit opt-out control.
+- When `No CLI seed` is active:
+  - the Seed input is disabled/grayed while retaining its stored value;
+  - Safari emits no `--seed` argument.
+- Seed value and enabled/disabled state are both persisted in local working state as `seed` and `seedDisabled`.
+- A valid non-empty `seed=` imported from `settings.txt` enables explicit Seed and loads that value.
+- An empty `seed=` imported from `settings.txt` selects `No CLI seed` while preserving the current stored Seed value for later re-enabling.
+- Seed is not added to `presets.txt` and does not change which preset is considered active.
 
 ## Processing controls
 
-Unchanged: `Optimizations` and `Interpolation` toggles (`--optimizations`/`--no-optimizations`, `--interpolation`/`--no-interpolation`). The interpolation target is a 5-way segmented control with the values `24`, `25`, `30`, `50`, `60` — the documented `interpolationFps` enum, not the request FPS.
+Unchanged: Optimizations and Interpolation toggles plus interpolation target values `24`, `25`, `30`, `50`, `60`.
 
-- When `Interpolation` is OFF, the interpolation target control is visually dimmed and its inputs are disabled, but the previously selected target value is retained in state and reapplied the moment `Interpolation` is turned back ON.
-- When `Interpolation` is ON, the target control is fully active.
+- The interpolation target is disabled visually and functionally while Interpolation is OFF.
+- Its selected preference remains stored and returns when Interpolation is turned back ON.
 
 ## Execution controls
 
-New section for local run preferences that are never part of a preset or `settings.txt` import:
+Execution stays intentionally minimal and contains **only**:
 
-- **Play result when finished**: an amber toggle, same visual language as every other switch. When ON it appends `--sound` (the Python client's actual play-on-completion flag, exposed as `-s`/`--sound`) to the generated command. There is no `--open-video` flag in the Python client; the UI's helper text names the real flag it sends.
+- **Play result when finished** → real Python flag `--sound`.
 
-An output-directory control was deliberately **not** added. iOS Safari has no API that lets a web page open a native folder picker and get back a real filesystem path — no File System Access API (`showDirectoryPicker`), and `<input webkitdirectory>` is unsupported there too (unlike the existing "Choose image" button, which only ever needed a *filename*, not a real path, because the Shortcut re-resolves it in Files/Photos). A manually-typed directory text field would look like a picker without behaving like one, so `--output` is always omitted and the Python client's own default (`<photo-name>_video.mp4` beside the source image) applies. If real folder selection is ever wanted, it belongs in the Shortcut itself (which does have genuine Files access), not in this Safari page.
+Do not add an output-directory picker, output-folder field, or `--open-video` control.
 
-## Command preview
+When a multi-prompt Parallel run has Combine videos OFF, there are several independent output files and the Python client has no single final result to play. In that configuration the Play-result control is disabled and `--sound` is omitted. Its checked preference may remain stored so it becomes effective again when the configuration returns to a single playable result.
 
-- Rebuilt from the live form state on every change; nothing here is hand-typed.
-- Multi-prompt runs render one repeated `--prompt '...'` argument per configured prompt, in list order, followed by the generation/processing flags, then (only for 2+ prompts) `--mode`, `--combine-videos`/`--no-combine-videos`, and (only in Parallel with 2+ prompts) `--max-parallel-tasks`, then the optional `--sound` flag.
-- The preview text wraps one argument group per line for readability. This is a *display-only* transform: the underlying command actually sent to the Shortcut (via Copy and via Launch) is always a single space-joined shell line — no real newlines are ever embedded in the executed command, so pasting it into a-Shell or letting the Shortcut run it behaves identically to a single-line command.
-- `Copy command` copies that single-line functional command (not the multi-line display text) to the clipboard.
-- `Reset` clears the persisted working state (`localStorage`), clears any legacy state/preset cache keys still lying around from earlier UI versions, reloads `presets.txt`, and restores every field — including the prompt list and Execution fields — to defaults.
+The Safari UI omits `--output`; the Python client's own precedence still applies: a configured `output=` in `artworks_settings.txt` may supply the path, otherwise the client falls back to `<photo-name>_video.mp4` beside the input.
+
+## Command Preview
+
+Command Preview is intentionally secondary to the main controls.
+
+- It starts **collapsed on every page load**.
+- Tapping its header toggles expanded/collapsed state.
+- Expanded state contains:
+  - generated command;
+  - Copy command;
+  - Reset.
+- The expanded/collapsed state is not persisted to `localStorage`.
+- The preview uses shell continuation markers between display lines. This keeps the readable multi-line representation executable if a user must press-and-hold copy it because the Clipboard API is unavailable.
+- `Copy command` still copies the canonical single-line command.
+- Launch also uses that same single-line command.
+- Validation errors may expand the panel automatically so the existing inline error toast remains visible.
 
 ## Launch flow
 
-Submitting the form validates that a filename is present and that every configured prompt is non-empty, then navigates to `shortcuts://run-shortcut?...` with a JSON payload of `{version, filename, cmd}`, where `cmd` is the single-line functional command described above.
+Submitting validates:
 
-## Visibility rules (summary)
+- filename exists;
+- every prompt is non-empty;
+- when `No CLI seed` is OFF, Seed is a valid signed 64-bit integer.
 
-Always visible: Preset, Source, Motion, Generation, Processing, Execution, Command Preview, Launch footer.
+If `No CLI seed` is ON, Seed validation is skipped for Copy/Launch and no `--seed` argument is emitted.
 
-Motion subcontrols:
+It then navigates to `shortcuts://run-shortcut?...` with `{version, filename, cmd}`.
 
-| Condition | Generation mode | Combine videos | Max parallel tasks |
-|---|---|---|---|
-| 1 prompt | hidden | hidden | hidden |
-| 2+ prompts, mode = Chain | shown | shown | hidden |
-| 2+ prompts, mode = Parallel | shown | shown | shown |
+## Visibility rules
 
-Processing subcontrols: interpolation target is enabled only when `Interpolation` is ON; the selected value persists in state either way.
+Always visible: Preset, Source, Motion, Generation, Processing, Execution, Command Preview header, sticky Launch footer.
+
+| Condition | Generation mode | Combine videos | Max parallel tasks | Play result |
+|---|---|---|---|---|
+| 1 prompt | hidden | hidden | hidden | available |
+| 2+ prompts, Chain | shown | shown | hidden | available |
+| 2+ prompts, Parallel + Combine ON | shown | shown | shown | available |
+| 2+ prompts, Parallel + Combine OFF | shown | shown | shown | disabled |
+
+Command Preview body is hidden until expanded.
 
 ## Reset behavior
 
-See Command preview above and `img2video-presets-settings-contract.md` for exactly which storage keys Reset clears and why.
+Reset clears the current working-state key plus known legacy keys, restores defaults (including `seed=42`, explicit Seed enabled, and one default prompt), and re-fetches `presets.txt`. Reset does not require a page reload.
 
 ## Mobile UX principles
 
-- Single-column, `main{width:min(760px,100%)}` layout with safe-area-aware padding, designed for iPhone Safari first.
-- All interactive controls keep a ≥32–48px min-height tap target (buttons, switches, range thumbs).
-- The sticky footer keeps the primary CTA (`Launch Shortcut`) and a status pill on-screen regardless of scroll position.
-- New Motion list controls (`Move up`/`Move down`/`Delete`) use explicit text+icon labels rather than icon-only buttons, since a compact icon alone would be ambiguous at this control density.
+- Keep the existing single-column `main{width:min(760px,100%)}` iPhone-first layout and safe-area padding.
+- Keep existing synthwave colors, cards, borders, typography, spacing, and control sizing.
+- Keep Launch Shortcut fixed at the bottom with the READY/status pill.
+- Seed / No CLI seed and Command Preview interactions must reuse existing control primitives rather than trigger a global CSS resizing pass.

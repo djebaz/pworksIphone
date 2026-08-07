@@ -1,4 +1,4 @@
-<!-- VERSION$00045$ | Edited: 07/08 | TIME: 07:21 -->
+<!-- VERSION$00046$ | Edited: 07/08 | TIME: 14:32 -->
 # AGENTS.md
 
 ## Scope
@@ -23,6 +23,37 @@ When documenting behavior or adding assertions, use these labels precisely:
 - **User-reported**: observed manually but not yet reproduced by an automated measurement in this repository.
 
 Do not upgrade inferred or user-reported behavior to confirmed without a reproducible test and saved evidence.
+
+---
+
+## File revision marker
+
+Comment-compatible canonical files use the first-line marker:
+
+```text
+# VERSION$NNNNN$ | Edited: DD/MM | TIME: HH:MM
+```
+
+For Markdown and HTML files, use the equivalent valid comment syntax, for example:
+
+```html
+<!-- VERSION$00046$ | Edited: 07/08 | TIME: 14:32 -->
+```
+
+`VERSION` is a **per-file revision number**, not a project-wide edit serial.
+
+Rules:
+
+- Each canonical file maintains its own independent version sequence.
+- When modifying a canonical file, read that file's current first-line `VERSION$NNNNN$` value and increment it by exactly 1.
+- If that file has never had a valid VERSION marker, initialize it at `VERSION$00001$`.
+- Do not scan, compare, synchronize, or derive VERSION numbers from other project files.
+- Different files may legitimately have the same VERSION number.
+- VERSION identifies successive revisions of one file only; Git provides project-wide history and edit ordering.
+- Keep exactly five zero-padded ASCII digits.
+- Update the Europe/Paris date and time after the final content modification and immediately before validation.
+- Delivery copies retain exactly the same marker as their canonical file and do not increment the version.
+- Never add a VERSION comment to strict JSON if doing so would invalidate the file.
 
 ---
 
