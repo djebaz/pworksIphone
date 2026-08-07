@@ -1,4 +1,4 @@
-<!-- VERSION$00008$ | Edited: 07/08 | TIME: 19:29 -->
+<!-- VERSION$00009$ | Edited: 07/08 | TIME: 19:46 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -25,6 +25,7 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
 - [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay option.
 - [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
+- [`chain-media-strategy.md`](chain-media-strategy.md) — selected no-FFmpeg Chain path using MP4Box.js for MP4/sample inspection, WebCodecs for H.264 decoding, and canvas for the single transition image.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
 ## Current direction
@@ -58,7 +59,7 @@ The Python/a-Shell process attempts to keep polling continuously, while the PWA 
 
 In that sense, the Python client's recovery model becomes the PWA's normal execution model.
 
-Chain mode remains feasible in principle but requires validation of browser-native final-frame extraction from the previous result. The current candidate uses an `HTMLVideoElement`, `requestVideoFrameCallback()`, canvas extraction, and a Blob rather than FFmpeg.
+Chain mode no longer has an FFmpeg dependency in the selected design. The preferred precise path is MP4Box.js for MP4/sample inspection plus WebCodecs `VideoDecoder` for the final GOP, followed by canvas export of exactly one transition frame. A simpler `<video>` + canvas path remains a prototype/fallback. The selected Chain design does not require `VideoEncoder`, audio processing, muxing, or ffmpeg.wasm.
 
 The PWA intentionally does not reproduce shell execution or FFmpeg video concatenation; every ArtWorks output remains independent.
 
@@ -103,7 +104,7 @@ A narrow future relay remains possible without moving reusable ArtWorks credenti
 
 **Preferred persistence approach:** use Safari/system Password AutoFill through a semantic username/password form, then keep the active credential in application memory while the PWA is unlocked. This delegates persistent credential storage to the user's password manager rather than creating an application-owned plaintext secret database.
 
-If the requirement is literally one physical device with no password-manager synchronization, the user's system Passwords/iCloud sync policy matters and must be treated separately from PWA storage.
+If the requirement is literally one physical device with no password-manager synchronization, the user's system Passwords/iCloud sync policy matters and must be treated separately from PWA storage policy.
 
 Raw `localStorage` is rejected for ArtWorks credentials. Encrypted IndexedDB + Web Crypto with an explicit unlock secret is a fallback to investigate only if real-device Password AutoFill testing is insufficient.
 
@@ -134,7 +135,9 @@ Each completed ArtWorks output is an independent file; the PWA will not reproduc
 
 Automatic output export/download remains a foreground/browser capability that needs physical-device testing on iOS. Durable export state should allow retry after interruption.
 
-Chain mode still needs the previous output's last frame. The current browser-native candidate uses a video element, `requestVideoFrameCallback()`, canvas extraction, and a Blob rather than FFmpeg. Automatic chain continuation should be designed to pause/recover cleanly if the page is suspended.
+Chain mode still needs the previous output's final displayed frame. The selected precise approach is MP4Box.js + WebCodecs: identify the final presentation sample and preceding sync sample, decode only the required final GOP, select the target `VideoFrame`, draw it to canvas, and export a still-image Blob. This remains subject to result-media CORS/Range behavior and physical-device validation.
+
+The PWA may gain useful lightweight MP4 metadata through MP4Box.js, but Python plus `ffprobe`/project probes remains the authoritative deep media measurement and provider-discovery environment. The PWA is the production surface, not a wholesale replacement for the diagnostic runtime.
 
 ## Deployment direction
 
