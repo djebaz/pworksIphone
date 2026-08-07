@@ -1,4 +1,4 @@
-<!-- VERSION$00048$ | Edited: 07/08 | TIME: 07:21 -->
+<!-- VERSION$00065$ | Edited: 07/08 | TIME: 10:29 -->
 # Developer Documentation
 
 `devdocs/` contains the durable technical documentation and reference material for pworksIphone. Runtime code and reusable tools live elsewhere in the repository.
@@ -11,6 +11,10 @@ devdocs/
 ├── api.md
 ├── derived-runtime-contract.md
 ├── image-to-video-runtime-contract.schema.json
+├── img2video-safari-ux-spec.md
+├── img2video-presets-settings-contract.md
+├── img2video-execution-model.md
+├── img2video-pr3-checklist.md
 ├── shortcut/
 │   ├── README.md
 │   ├── annotated-en.html
@@ -42,6 +46,15 @@ The API documentation keeps three FPS concepts separate: generation request `fps
 The derived schema is **not** an official ArtWorks OpenAPI document and must not be edited or described as though it were one. It follows the documented interpolation target enum `24 | 25 | 30 | 50 | 60`, keeps `applyInterpolation` boolean, and does not promote conflicting executor observations into a universal model-specific interpolation rule.
 
 Because the contract is strict JSON, it intentionally has no line-1 VERSION comment; adding one would invalidate JSON.
+
+## Img2Video Safari UI
+
+Three documents cover the Safari-facing UI at `shortcuts/img2video/index.html` and its multi-prompt/execution capabilities:
+
+- [`img2video-safari-ux-spec.md`](img2video-safari-ux-spec.md) is the canonical UX spec: section order, exact controls, visibility rules, and mobile UX principles.
+- [`img2video-presets-settings-contract.md`](img2video-presets-settings-contract.md) explains the three configuration layers — `presets.txt`, `settings.txt` import, and `localStorage` working state — and exactly which fields each one may touch.
+- [`img2video-execution-model.md`](img2video-execution-model.md) explains how the live UI state becomes the CLI command handed to `app/img2video_iphone.py`, including multi-prompt encoding, chain/parallel mode, and the execution-only settings (output directory, play-on-finish).
+- [`img2video-pr3-checklist.md`](img2video-pr3-checklist.md) tracks acceptance criteria and documents judgment calls made where the feature request and the actual Python client diverged (e.g. the real play-on-completion flag is `--sound`, not `--open-video`).
 
 ## `shortcut/`
 
