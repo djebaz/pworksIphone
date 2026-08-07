@@ -1,4 +1,4 @@
-<!-- VERSION$00003$ | Edited: 07/08 | TIME: 18:57 -->
+<!-- VERSION$00004$ | Edited: 07/08 | TIME: 20:12 -->
 # PWA Security and API Architecture
 
 ## Purpose
@@ -33,7 +33,7 @@ Therefore:
 - GitHub Actions secrets are secret while a workflow runs, but a value injected into a deployed browser asset becomes public to anyone who can fetch that asset;
 - JavaScript environment variables produced at build time are not secret once bundled or emitted into the site;
 - a Service Worker is client-side code and is not a secret store;
-- Cache Storage, IndexedDB, and `localStorage` are client-side storage, not server-side environment variables;
+- Cache Storage, IndexedDB, OPFS, and `localStorage` are client-side origin storage, not server-side environment variables;
 - obfuscation, Base64, minification, or splitting a credential across files does not make it secret.
 
 A static PWA cannot contain a reusable private ArtWorks password and keep that password hidden from its own browser runtime.
@@ -46,7 +46,7 @@ The PWA asks the user for their ArtWorks username/password locally and calls Art
 
 ### Advantages
 
-- GitHub Pages remains sufficient for application hosting.
+- GitHub Pages remains sufficient for application hosting if CORS permits direct access.
 - No general ArtWorks proxy needs to be operated.
 - Credentials are not committed to the repository or embedded in public deployment artifacts.
 - Each user consumes their own ArtWorks account rather than a shared project credential.
@@ -58,9 +58,19 @@ ArtWorks must allow the deployed PWA origin to make authenticated cross-origin r
 
 The fact that the Python client works is not evidence of browser CORS support.
 
-Current status: **Unverified.**
+Current status: **Unknown / unverified at runtime.**
 
 A non-billable browser/preflight probe should be performed before generation implementation. Do not create a live generation merely to discover a CORS header.
+
+The preflight gate must include at least the production async creation shape:
+
+```text
+POST /api/v3/tasks
+Authorization
+Content-Type
+```
+
+Then verify the known-ID GET/cancel/priority operations required by the selected UI.
 
 ## Preferred credential persistence hierarchy
 
@@ -151,14 +161,45 @@ IndexedDB is excellent for structured application data but is not intrinsically 
 
 ## Credential threat model
 
-The primary browser threat is cross-site scripting: malicious JavaScript executing with the PWA's origin privileges can potentially read application storage and can access a credential while the application has unlocked it for use.
+The primary browser threat is cross-site scripting or malicious same-origin JavaScript: code executing with the PWA's origin privileges can potentially read application storage and access a credential while the application has unlocked it for use.
 
 Therefore:
 
 - no browser storage mechanism makes an unlocked reusable credential immune to same-origin script compromise;
 - encryption at rest primarily reduces exposure from raw storage inspection or accidental leakage;
 - the strongest client-only control is to minimize the amount of code allowed to execute at the PWA origin;
-- task/history persistence and credential persistence must be separated.
+- task/history persistence and credential persistence must be separated;
+- deployment topology must prevent untrusted code from sharing the credential-bearing origin.
+
+## Same-origin preview/fork security gate
+
+This is now a first-class deployment prerequisite.
+
+The previously proposed GitHub Pages layout uses pathname separation:
+
+```text
+production: /pwa/
+preview:    /preview/pr-<number>/pwa/
+```
+
+That pathname separation is useful for navigation and Service Worker scoping, but it is **not an origin-level security boundary**. Pages under the same scheme/host/port share the same web origin.
+
+Consequences:
+
+- IndexedDB and OPFS are origin-scoped rather than path-scoped;
+- same-origin JavaScript must be treated as capable of interacting with same-origin state/resources even if it is served from another pathname;
+- Password AutoFill/browser credential behavior must not be assumed to isolate `/pwa/` from `/preview/...`;
+- Service Worker scope can restrict which pages one worker controls but does not turn one pathname into a separate origin.
+
+**Decision:** do not let untrusted PR/fork JavaScript execute under the same origin that will receive real ArtWorks credentials.
+
+Before production credentials are used, choose one of these trust models:
+
+1. only trusted code/branches are ever deployed beneath the credential-bearing Pages origin;
+2. production PWA moves to a separate trusted hostname/origin and previews stay elsewhere;
+3. untrusted preview deployment is disabled or moved to an origin that never receives real credentials.
+
+This is a Stage 0 go/no-go decision, not later deployment polish.
 
 ## Frontend security requirements
 
@@ -168,7 +209,11 @@ Because the future PWA will handle credentials directly, copying the legacy sing
 
 Do not load analytics, tag managers, UI frameworks, CDN libraries, or other third-party runtime scripts without a concrete need and security review.
 
-The dependency-free/plain-JavaScript project direction is an advantage here.
+The dependency-light/plain-JavaScript project direction is an advantage here.
+
+If Mediabunny is selected for Chain, pin and vendor a reviewed build under the repository-controlled `pwa/` source rather than loading it from a third-party CDN at runtime.
+
+Use MP4-only/tree-shaken imports where practical so unrelated demuxers/features are not part of the credential-bearing runtime.
 
 ### Fonts
 
@@ -193,8 +238,8 @@ The initial policy should be allowlist-based and tightened around the actual PWA
 - styles from `'self'` only if CSS is separated;
 - worker and manifest from `'self'`;
 - image support for local resources plus `blob:`/`data:` where genuinely required;
-- explicit `connect-src` for the ArtWorks API and any verified media origin;
-- explicit `media-src` for downloaded/processed result media if needed;
+- explicit `connect-src` for the ArtWorks API and verified result-media origins;
+- explicit `media-src` for remote/result media if needed;
 - no arbitrary remote script hosts.
 
 Do not finalize `connect-src`/`media-src` until real ArtWorks result origins and CORS behavior are known.
@@ -211,14 +256,46 @@ Use IndexedDB for structured non-secret application state such as:
 
 - runs and prompt sets;
 - remote task IDs;
+- local submission UUIDs/fingerprints;
 - parameters and last known status;
 - phase timestamps and retry counters;
-- output/download state;
+- output/staging/export state;
 - reusable history.
 
 Keep credential handling logically separate so task/history code does not accidentally serialize the user's secret into logs, exports, or debugging views.
 
-The application may request durable browser storage through `navigator.storage.persist()` after meaningful user state exists. Persistent storage improves eviction resistance; it does not make data cryptographically secret.
+The application may request durable browser storage through `navigator.storage.persist()` after checking `persisted()`. Persistent storage improves eviction resistance; it does not make data cryptographically secret.
+
+OPFS may be used for private media staging. Like IndexedDB, it is origin-owned application state rather than a user-visible or cryptographically isolated file vault.
+
+## Result-media browser boundary
+
+ArtWorks result media must be tested separately from the API host.
+
+A cross-origin MP4 can be playable by `<video>` while remaining unreadable to JavaScript/canvas/media libraries.
+
+Chain requires JavaScript-readable media bytes, so validate:
+
+- CORS from the real production origin;
+- partial/random access used by Mediabunny;
+- any response header exposure relied upon by staging validation;
+- actual track decodability on target iPhone.
+
+Do not treat successful playback as proof of Chain access.
+
+## Submission safety and custom headers
+
+Persist local submission intent before every potentially billable creation POST.
+
+The current authenticated ArtWorks contract does **not document** creation idempotency.
+
+Do not send an undocumented `Idempotency-Key` by default:
+
+- no provider semantics are established;
+- an extra custom header changes CORS preflight requirements;
+- unknown headers may be rejected or ignored.
+
+A client submission UUID still belongs in the durable ledger. A deterministic documented ArtWorks tag may be used as non-secret correlation evidence, but the current contract exposes no task-list/filter endpoint that turns it into an orphan-recovery mechanism.
 
 ## Service Worker security boundary
 
@@ -232,25 +309,29 @@ Do not:
 - log the `Authorization` header;
 - persist a decrypted credential in Service Worker globals and assume those globals are durable/private.
 
-The background-execution research recommends foreground/recovery-driven ArtWorks polling rather than credential-bearing background polling.
+The background-execution research recommends foreground/reconciler-driven ArtWorks monitoring rather than credential-bearing background polling.
+
+Relative Service Worker paths/scopes are still required so preview workers cannot control production pages, but worker scope does not replace the same-origin preview trust rule.
 
 ## Web Push and the credential boundary
 
 Web Push requires an external sender. Under the selected architecture, that sender must not be given the user's reusable ArtWorks username/password merely so it can poll tasks.
 
-The clean future notification path would use an ArtWorks webhook/callback or a scoped/delegated provider credential that lets a minimal relay learn task completion without taking possession of the reusable account password.
+The clean notification path would require an ArtWorks webhook/callback or similarly trusted provider-side completion event that lets a minimal relay map an opaque task/correlation value to a push subscription.
 
-Current status of ArtWorks webhook/callback support: **Unknown.** No authoritative mechanism was identified in current project sources or the web research performed for this discovery. This absence must not be promoted to a claim that the provider does not support one.
+Current authenticated ArtWorks contract status: **webhook/callback registration is not documented.**
 
-See [`background-execution-and-notifications.md`](background-execution-and-notifications.md) for the platform analysis.
+Therefore the credential-free relay has been removed from the active implementation stages. Revisit it only if a newer/provider-specific contract establishes a trusted completion event. Do not move the reusable password to a relay merely to regain polling.
+
+See [`background-execution-and-notifications.md`](background-execution-and-notifications.md) and [`runtime-architecture.md`](runtime-architecture.md).
 
 ## Alternative architectures retained as fallbacks
 
 ### Authenticated server-side proxy
 
-A conventional proxy would avoid browser CORS and could protect the ArtWorks credential server-side, but it conflicts with the selected user-owned credential direction unless users explicitly delegate credentials to it.
+A conventional proxy would avoid browser CORS and could protect a provider credential server-side, but it conflicts with the selected user-owned credential direction unless users explicitly delegate credentials to it.
 
-Retain this only as a fallback if direct browser calls are impossible and no provider-scoped credential exists.
+Retain this only as a fallback if direct browser calls are impossible and the product owner deliberately changes the credential boundary.
 
 A public unauthenticated proxy remains unacceptable because strangers could create billable tasks.
 
@@ -275,7 +356,24 @@ The following are not security solutions:
 - a raw ArtWorks password stored in `localStorage`;
 - a secret committed to the public repository with Base64/minification/obfuscation;
 - ciphertext with its reusable decryption key stored alongside it under the same origin and described as secure;
-- a public proxy with no caller authentication.
+- a public proxy with no caller authentication;
+- untrusted PR/fork JavaScript sharing the credential-bearing production origin.
+
+## Orion extension comparison
+
+The supplied Orion extensions demonstrate browser-extension capability differences but do not weaken the PWA security requirements.
+
+### RedGifs Downloader for Orion
+
+The inspected extension declares RedGifs host permissions plus the `downloads` permission, resolves a direct MP4 URL, and delegates the transfer to the extension downloads API.
+
+That privileged extension model is not evidence that an ordinary PWA can bypass cross-origin browser policy.
+
+### Orion Lite
+
+The inspected extension controls the page's existing `HTMLVideoElement` with ordinary playback/seek/rate/inline-media operations and stores only non-secret settings.
+
+It provides no alternative precedent for reusable ArtWorks credential persistence.
 
 ## Logging and diagnostics
 
@@ -290,16 +388,18 @@ The project-wide API safety rules continue to apply in the browser:
 
 ## Recommended implementation order
 
-1. Build the PWA shell without live credentials or submission.
-2. Implement IndexedDB task/run/history schema separately from credential handling.
-3. Implement and physical-device-test a semantic ArtWorks credential form using Safari Password AutoFill (`autocomplete="username"` and `autocomplete="current-password"`).
-4. Keep the credential in memory after fill/unlock rather than persisting plaintext in application storage.
-5. Add restrictive CSP and keep runtime assets local.
-6. Run a non-billable ArtWorks CORS/preflight check from the real GitHub Pages PWA origin.
-7. If Password AutoFill cannot provide acceptable restart UX, prototype encrypted IndexedDB + Web Crypto as the explicit fallback.
-8. Only if CORS succeeds, implement authenticated read/validation behavior.
-9. Submit a real generation only with explicit awareness that acceptance may be billable.
-10. Re-evaluate provider token/webhook capabilities before adding push infrastructure.
+1. Resolve the production-vs-preview origin trust model before real credentials are used.
+2. Run a non-billable ArtWorks CORS/preflight check from the intended production origin.
+3. Test result-media JavaScript CORS/partial reads with an already-paid result where possible.
+4. Build the isolated PWA shell without a live billable workflow.
+5. Implement IndexedDB Run/Step/Task schema separately from credential handling.
+6. Implement and physical-device-test a semantic ArtWorks credential form using Safari Password AutoFill.
+7. Keep the credential in memory after fill/unlock rather than persisting plaintext in application storage.
+8. Add restrictive CSP and keep runtime assets/dependencies local.
+9. If Password AutoFill cannot provide acceptable restart UX, prototype encrypted IndexedDB + Web Crypto as the explicit fallback.
+10. Only after CORS and origin trust succeed, implement authenticated provider operations.
+11. Submit a real generation only with explicit awareness that acceptance may be billable.
+12. Re-evaluate provider callback/token capabilities only when concrete new evidence appears.
 
 ## Current recommendation
 
@@ -307,7 +407,7 @@ Proceed with user-owned credentials, but make **Safari/system Password AutoFill 
 
 Use IndexedDB for structured run/task/history state. Keep the active credential in memory after the user enters or AutoFills it. If AutoFill proves insufficient on the installed Home Screen PWA, evaluate encrypted IndexedDB + Web Crypto with an explicit unlock secret as a fallback — not raw `localStorage` and not a fake zero-friction encryption scheme.
 
-Direct ArtWorks requests remain contingent on verified CORS support. If CORS fails, the architecture must be revisited rather than weakened by publishing credentials or creating an unauthenticated proxy.
+Direct ArtWorks requests remain contingent on verified CORS support and a trusted production origin. If CORS fails, or untrusted preview code shares the credential-bearing origin, the architecture must be revisited rather than weakened.
 
 ## Research references
 
@@ -319,5 +419,7 @@ Primary security/platform references reviewed:
 - OWASP Content Security Policy Cheat Sheet — strict CSP as XSS defense in depth.
 - MDN Web Crypto API — PBKDF2 key derivation and AES-GCM authenticated encryption for the optional fallback.
 - MDN IndexedDB API — structured asynchronous browser storage.
+- WebKit/MDN Origin Private File System documentation.
 - MDN StorageManager `persist()` — durable-storage request semantics.
 - web.dev persistent storage guidance — request persistence when durable user state becomes meaningful.
+- inspected Orion extension packages supplied during discovery.
