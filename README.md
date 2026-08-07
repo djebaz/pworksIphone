@@ -19,7 +19,9 @@ pworksIphone/
 │
 ├── shortcuts/
 │   └── img2video/
-│       └── index.html
+│       ├── index.html
+│       └── dist/
+│           └── Run_Img2Video_in_a-Shell.shortcut
 │
 ├── tools/
 │   ├── shortcuts/
@@ -53,11 +55,14 @@ Production Python runtime for image-to-video generation on iPhone. `img2video_ip
 
 ### `shortcuts/`
 
-Runtime components directly involved in the iOS Shortcut workflow. `shortcuts/img2video/index.html` is the current Safari UI that prepares the `{filename, cmd}` payload and launches `Run Img2Video in a-Shell`.
+Runtime components directly involved in the iOS Shortcut workflow.
+
+- `shortcuts/img2video/index.html` is the Safari launcher/UI. It prepares the `{filename, cmd}` payload and launches `Run Img2Video in a-Shell`.
+- `shortcuts/img2video/dist/` contains the signed, installable Shortcut artifact (`Run_Img2Video_in_a-Shell.shortcut`) that users import into the iOS Shortcuts app. This binary is not modified by hand; it is exported/signed from the Shortcuts app itself.
 
 ### `tools/`
 
-Reusable development utilities. `tools/shortcuts/dlshort.py` downloads and extracts unsigned iCloud Shortcut data. ArtWorks API discovery and timing probes live under `tools/probes/`.
+Reusable development utilities. `tools/shortcuts/dlshort.py` is the utility used to download and extract unsigned iCloud Shortcut data. ArtWorks API discovery and timing probes live under `tools/probes/`.
 
 Some probe commands may create real ArtWorks tasks and may therefore be billable. Read their help and `AGENTS.md` before running them.
 
@@ -67,7 +72,7 @@ Non-production implementations and prototypes. Experimental behavior should be m
 
 ### `devdocs/`
 
-Developer documentation and reference material. See [`devdocs/README.md`](devdocs/README.md) for the documentation map.
+Developer documentation and reference material. `devdocs/shortcut/` contains reconstruction and reference documentation for the Shortcut workflow, not the installable Shortcut itself — the installable artifact lives at `shortcuts/img2video/dist/`. See [`devdocs/README.md`](devdocs/README.md) for the full documentation map.
 
 ## Agent instructions
 

@@ -30,13 +30,15 @@ API findings must retain their evidence level:
 
 ## `shortcut/`
 
-Documentation for the current `Run Img2Video in a-Shell` integration.
+Reconstruction and reference documentation for the current `Run Img2Video in a-Shell` integration — not the installable Shortcut itself.
 
 `README.md` contains the exact reconstructed workflow and its `{filename, cmd}` contract. The annotated English and French HTML files provide visual references for the same Shortcut.
 
 The live Safari-facing UI is not documentation and therefore lives at `shortcuts/img2video/index.html`.
 
-The utility used to download unsigned Shortcut data is a reusable tool and therefore lives at `tools/shortcuts/dlshort.py`.
+The signed, installable Shortcut artifact is not documentation either and therefore lives at `shortcuts/img2video/dist/Run_Img2Video_in_a-Shell.shortcut`.
+
+The utility used to download and extract unsigned Shortcut data is a reusable tool and therefore lives at `tools/shortcuts/dlshort.py`.
 
 ## `references/`
 
