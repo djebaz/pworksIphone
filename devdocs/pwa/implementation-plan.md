@@ -1,4 +1,4 @@
-<!-- VERSION$00002$ | Edited: 07/08 | TIME: 19:52 -->
+<!-- VERSION$00003$ | Edited: 07/08 | TIME: 20:08 -->
 # PWA Implementation Plan
 
 ## Purpose
@@ -6,6 +6,8 @@
 Define a staged, reversible path from the existing Safari/Shortcut/a-Shell workflow to a new GitHub Pages-hosted PWA without destabilizing the working implementation.
 
 No runtime changes are made by this discovery PR.
+
+The implementation model is now defined in [`runtime-architecture.md`](runtime-architecture.md). This plan orders that architecture into go/no-go gates and product stages.
 
 ## Repository layout target
 
@@ -22,239 +24,347 @@ pwa/
 └── ...
 ```
 
-A `service-worker.js` is not assumed. Because offline mode is explicitly not required, it should only be added if a concrete later requirement justifies it.
-
 Planning and technical evidence remain under:
 
 ```text
 devdocs/pwa/
 ```
 
-The working implementation remains untouched:
+The working implementation remains untouched during discovery/bootstrap:
 
 ```text
 shortcuts/img2video/
 app/img2video_iphone.py
 ```
 
-## Phase 0 — discovery and contracts
+A `service-worker.js` is not assumed. No offline-generation requirement exists, and a Service Worker must not be added merely for the PWA label.
 
-Status: in progress.
+## Stage 0 — non-billable viability gates
 
-### Deliverables
+**Status: in progress.**
 
-- document current Safari UI behavior;
-- inventory Python responsibilities that may need browser equivalents;
-- document GitHub Pages deployment topology;
-- determine credential architecture;
-- determine ArtWorks CORS/browser feasibility;
-- identify features that require browser-native media libraries versus shell/FFmpeg functionality;
-- choose the first PWA functional milestone.
+Stage 0 adds no production ArtWorks workflow and submits no billable generation task.
 
-### Exit criteria
+Its purpose is to determine whether the selected pure-client architecture is viable before implementation cost or credentials are committed to it.
 
-No implementation begins until the authentication boundary is understood well enough that credentials will not be exposed accidentally.
+### Gate 0A — API CORS
 
-## Phase 1 — isolated installable shell
+From the intended GitHub Pages origin, probe ArtWorks browser access to the production asynchronous task API.
 
-Create `pwa/` without modifying or replacing the working launcher.
+At minimum verify the preflight needed for:
 
-### Initial goals
+```text
+Origin: intended Pages origin
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: authorization, content-type
+```
 
-- copy/preserve the current visual design and responsive layout as the starting UI;
-- add a valid web app manifest;
-- add iOS standalone metadata;
-- add application icons once an icon direction is selected;
-- use `display: "standalone"`;
-- choose theme/background colors that visually blend with the existing dark UI;
-- keep the current image-picker behavior;
-- keep local state behavior where useful;
-- avoid offline caching;
-- avoid framework/build-system dependencies.
+Also verify browser access for the known-ID status/cancel/priority operations as needed.
 
-### Validation
+**Go:** the real browser can send authenticated task operations from the selected origin.
 
-- normal Safari tab works;
-- Add to Home Screen launches cleanly on iPhone/iPad;
-- standalone safe areas are correct;
-- Chromium recognizes the manifest/installable app metadata;
-- the new PWA is isolated from the working application.
+**No-go:** direct browser -> ArtWorks architecture is blocked and the credential/network boundary must be redesigned before Stage 1.
 
-## Phase 2 — API proof of concept
+No generation request is required for this gate.
 
-Implement only enough API functionality to prove the selected authentication architecture and browser connectivity.
+### Gate 0B — result-media JavaScript access
 
-### Scope
+Using an already-paid completed task/result if available, test the media URL separately from the API host.
 
-- authenticate using the selected safe architecture;
-- submit one explicit image-to-video task;
-- persist the task ID immediately;
-- poll task status;
-- display terminal success/failure;
-- expose/download the result video;
-- preserve documented model/request constraints from the project contract.
+Verify:
 
-### Safety
+- JavaScript `fetch()` access under CORS;
+- partial/random reads needed by the media reader;
+- media bytes are readable by the PWA;
+- relevant response headers are exposed if the implementation relies on them.
 
-- avoid full test matrices;
-- use non-billable validation where possible;
-- treat any accepted generation request as potentially billable;
-- record task IDs;
-- do not log credentials or full Base64 image data.
+This gate is distinct from whether `<video>` can simply play the URL. A browser may play cross-origin media that JavaScript cannot inspect.
 
-### Required evidence
+### Gate 0C — origin trust and preview topology
 
-- browser CORS/preflight behavior;
-- result-media browser behavior;
-- iOS standalone networking behavior;
-- interruption/resume behavior.
+Credentials must not be introduced until the Pages deployment topology has a clear trust boundary.
 
-## Phase 3 — robust single-prompt parity
+Current PR previews are path-based under the same Pages origin. Path separation is **not** an origin-level security boundary for browser storage or credential-associated browser behavior.
 
-Port the reliable parts of the Python execution lifecycle that make sense in the browser:
+Before real ArtWorks credentials are used:
 
-- input validation;
-- explicit model selection;
-- model-specific FPS/frame constraints;
-- interpolation contract;
-- task status transitions;
-- bounded retry logic;
-- persisted task/recovery state;
-- completed-result download;
-- useful error reporting;
-- duplicate-submission prevention after interruption/reload.
+- decide whether PR/fork preview content is fully trusted;
+- if untrusted code can ever be published beneath the same credential-bearing origin, move the production PWA to a separate trusted origin/hostname or stop serving untrusted previews there;
+- keep Service Worker scopes relative/path-limited, but do not mistake Service Worker scope for origin isolation.
 
-Prefer browser-native APIs and small plain-JavaScript modules.
+This is a go/no-go security decision, not later polish.
 
-## Phase 4 — multi-prompt and parallel behavior
+### Gate 0D — Chain media fixture
 
-Study and, where feasible, port:
+Using a local/non-billable representative H.264 MP4 fixture on the target iPhone:
 
-- ordered multiple prompts;
-- parallel submission limits;
-- per-task progress;
-- recovery of partially completed parallel runs;
-- preservation of every completed output as soon as it becomes available.
+1. load the pinned Mediabunny subset;
+2. use `Input({ formats: [MP4] })`;
+3. verify `track.canDecode()`;
+4. retrieve `VideoSampleSink.getSample(Infinity)`;
+5. draw/export a non-empty JPEG/PNG Blob;
+6. close/dispose media resources;
+7. observe acceptable memory behavior.
 
-Do not assume browser background execution is equivalent to a long-running Python process. iOS may suspend a standalone PWA when it is backgrounded. Recovery must therefore be based on persisted remote task IDs rather than continuous execution assumptions.
+Do not wait for a billable Chain run to discover a local codec/library incompatibility.
 
-## Phase 5 — chain mode feasibility
+### Stage 0 exit criteria
 
-Chain mode requires the final displayed frame of the previous ArtWorks video as the image for the next task, but it does **not** require video re-encoding, audio processing, or output muxing.
+All of the following must be known:
 
-The preferred implementation candidate is now **Mediabunny**, not FFmpeg/WASM.
+- production origin is trusted for credentials;
+- ArtWorks API CORS either passes or the architecture has been redesigned;
+- result-media JavaScript access is viable for Chain or Chain is explicitly disabled;
+- Password AutoFill remains the selected credential persistence model;
+- no undocumented provider feature is required for correctness.
 
-### Preferred path
+## Stage 1 — single-prompt production slice
 
-1. construct a Mediabunny `Input` backed by `UrlSource` for the completed result URL;
-2. obtain the primary video track;
-3. call `InputVideoTrack.canDecode()` before attempting Chain advancement;
-4. use `VideoSampleSink.getSample(Infinity)` to retrieve the final decoded frame in presentation order;
-5. draw/export that `VideoSample` through canvas as a JPEG/PNG Blob;
-6. persist the transition-image state;
-7. submit the next ArtWorks task and immediately persist its remote task ID.
+Build the smallest complete production flow. No Chain media processing is required.
 
-Mediabunny is attractive here because it already combines MP4 parsing, optimized remote media reads, sample timing/presentation-order handling, and WebCodecs-backed decoding behind a higher-level API.
+### UI/bootstrap
 
-### Fallback/debug paths
+- preserve the existing visual language and file-picker behavior;
+- add the manifest and standalone iOS metadata;
+- use the final icon when available; do not create a temporary icon;
+- no custom install banner;
+- no offline-generation simulation.
 
-Retain two lower-level options for validation and troubleshooting:
+### Credential flow
 
-- MP4Box.js + direct WebCodecs for explicit MP4/sample/decode control;
-- `<video>` + canvas as the simplest compatibility prototype.
+- semantic username/current-password fields for Password AutoFill;
+- active credentials in memory only after unlock/fill;
+- locked/authentication-required state is normal and recoverable;
+- no reusable ArtWorks password in IndexedDB/localStorage.
 
-Do not add ffmpeg.wasm for Chain unless all lighter browser-native/library approaches fail on representative ArtWorks output media.
+### Durable ledger
 
-### Required validation
+Implement `Run -> Step -> Task` records in IndexedDB.
 
-Before Chain can submit its first billable task on a device:
+Persist before POST:
 
-- validate the selected media library against a local/non-billable H.264 MP4 fixture;
-- confirm the actual track is decodable on target iPhone/iOS;
-- confirm final-frame retrieval/export produces a valid non-empty image Blob;
-- separately verify ArtWorks result-media CORS and partial-read behavior using an already-paid result where possible;
-- measure actual network bytes, peak memory and selected vendored bundle size;
-- verify the extracted frame is accepted as the next ArtWorks task input.
+- local run/step ID;
+- client submission UUID;
+- request fingerprint without raw image bytes;
+- intent timestamp.
 
-### Dependency policy
+After successful task creation, bind the returned remote task ID immediately.
 
-If Mediabunny is selected for production, pin and vendor a reviewed build under the repository-controlled `pwa/` source. Do not load credential-adjacent runtime code from a third-party CDN.
+### Reconciler
 
-Keep Python + `ffprobe`/project probes as the authoritative deep media measurement and provider-discovery environment; the PWA uses only the media functionality required for the production workflow.
+Run on:
 
-## Phase 6 — video assembly feasibility
+- cold start;
+- visibility return;
+- network return;
+- optionally `pageshow` through the same idempotent entry point.
 
-The existing Python client can concatenate/re-encode outputs with FFmpeg. Browser parity is not automatic.
+The poll loop is a foreground optimization. Correctness must come from ledger + reconciler.
 
-Investigate separately:
+### Task lifecycle
 
-- whether assembly is truly required in the PWA milestone;
-- browser-native WebCodecs/MediaRecorder feasibility on target iOS;
-- direct source-stream compatibility where concatenation might avoid re-encoding;
-- a server-side assembly option;
-- FFmpeg/WASM only as a last-resort client-side option.
+Use only asynchronous production creation:
 
-A PWA should not silently claim full Python feature parity until output assembly is verified.
+```text
+POST /api/v3/tasks
+```
 
-## Phase 7 — Pages deployment
+Do not use `/tasks-sync` for production.
 
-The current Pages workflow publishes `shortcuts/img2video/` as the site root and PR snapshots under `/preview/pr-<number>/`.
+Support the full authenticated status enum defensively, including `preparing` and bounded handling of `unknown`.
 
-When the PWA is ready for deployment, explicitly choose the public layout.
+Never blindly retry an ambiguous creation POST.
 
-Preferred discovery candidates:
+### Completed output
 
-### Candidate A — PWA under `/pwa/`
+Separate states:
 
-- existing launcher remains at the current Pages root;
-- new app is independently reachable at `/pwa/`;
-- lowest migration risk;
-- manifest `start_url` and `scope` stay relative to the PWA directory.
+```text
+remote-completed -> staged -> exported
+```
 
-### Candidate B — PWA becomes the Pages root
+OPFS may be used as origin-private staging. Prefer streaming/bounded memory where practical. Reject obvious HTML/error payloads and non-video content types.
 
-- clean final URL;
-- requires a conscious migration of the current launcher;
-- higher blast radius;
-- should happen only after parity is established.
+User-visible Files/Photos/share/export behavior must be tested on the target iPhone.
 
-### Candidate C — explicit legacy and PWA paths
+### Stage 1 acceptance
 
-- both applications receive stable named paths;
-- root can redirect or provide a small selector later;
-- more deployment structure but clear long-term ownership.
+A single prompt can survive:
 
-No candidate is selected in this discovery PR.
+- page suspension;
+- reload;
+- loss/recovery of network;
+- credential relock;
+
+without duplicating a known or ambiguous potentially billable submission.
+
+## Stage 2 — multi-prompt and parallel
+
+Add multiple independent deliverables.
+
+### Submission policy
+
+**Serialize new task-creation POSTs.**
+
+Parallel mode means multiple already-identified remote tasks may execute/poll concurrently. It does not mean multiple task-creation requests should simultaneously occupy the orphan window.
+
+After each task ID is durably stored, permit bounded concurrent:
+
+- status reconciliation/polling;
+- output staging;
+- export preparation.
+
+### Partial completion
+
+A partially completed run remains useful.
+
+If three of five tasks complete, preserve those three outputs and their history. Retrying a failed/incomplete item must not recreate completed work.
+
+### Stage 2 acceptance
+
+- serialized submission is enforced;
+- each remote ID is persisted independently;
+- reload/reopen reconciles every known non-terminal task;
+- completed outputs remain independently exportable;
+- a failure in one item does not destroy the run ledger.
+
+## Stage 3 — Chain
+
+Add dependent steps only after Stage 1/2 reliability is stable and the Stage 0 media fixture passes.
+
+### Selected media path
+
+No FFmpeg/ffmpeg.wasm is required for normal Chain advancement.
+
+Preferred path:
+
+```text
+ArtWorks result URL
+  -> Mediabunny UrlSource
+  -> Input({ formats: [MP4] })
+  -> primary video track
+  -> track.canDecode()
+  -> VideoSampleSink.getSample(Infinity)
+  -> final presentation-order VideoSample
+  -> canvas
+  -> JPEG/PNG Blob
+  -> persist transition artifact/state
+  -> next async ArtWorks task
+```
+
+### Mediabunny production constraints
+
+- pin and vendor the reviewed build under `pwa/`;
+- do not load it from a third-party CDN at runtime;
+- import only the MP4 format required for ArtWorks output rather than `ALL_FORMATS`;
+- override `UrlSource` default infinite retry with a bounded project policy;
+- close `VideoSample` promptly and dispose the `Input` after use;
+- keep packet-statistics scans out of the hot path unless needed for diagnostics.
+
+Fallback/debug paths:
+
+1. MP4Box.js + direct WebCodecs;
+2. `<video>` + canvas as the simplest compatibility experiment.
+
+### Chain suspension semantics
+
+The dependent next POST occurs only while the PWA can execute.
+
+If iOS suspends after task N completes remotely:
+
+```text
+reopen/visible
+  -> reconciler finds task N completed
+  -> obtain/refresh result URL
+  -> extract transition frame
+  -> persist transition state
+  -> create task N+1
+  -> persist N+1 task ID
+```
+
+Do not pretend Chain continues locally while the PWA is suspended.
+
+### Stage 3 acceptance
+
+- representative Wan/LTX output parses and decodes on target iPhone;
+- the retrieved sample is the true final presentation frame;
+- exported image Blob is valid;
+- next ArtWorks request accepts the transition image;
+- interruption at every local boundary resumes without repeating an already completed remote step.
+
+## Server/relay stage — not currently planned
+
+A credential-free Web Push relay remains conceptually attractive only if ArtWorks can emit a trusted completion callback/event.
+
+Webhook/callback registration is **not documented** in the current authenticated contract.
+
+A relay that polls ArtWorks would need the reusable ArtWorks credential and violates the selected device-owned credential boundary.
+
+Therefore no relay stage is on the active plan. Revisit only if provider capabilities change.
+
+## Video assembly
+
+**Product decision:** the PWA does not concatenate/re-encode generated outputs into one final video.
+
+Each ArtWorks output is an independent deliverable.
+
+Do not add FFmpeg/WASM, Mediabunny conversion, WebCodecs encoding, or server-side assembly merely to reproduce the Python combine feature unless the product decision changes later.
+
+The authenticated ArtWorks task-type enum contains `run-ffmpeg`, but its payload schema, account entitlement and billing are not yet established and it is not required by the selected PWA workflow.
+
+## Python/probe relationship
+
+Keep a deliberate dual runtime:
+
+### PWA
+
+- production interaction surface;
+- credentials/use in memory;
+- ledger/reconciliation;
+- task orchestration;
+- Chain transition-frame extraction;
+- normal staging/export.
+
+### Python + probes
+
+- provider discovery;
+- reproducible validation experiments;
+- `ffprobe`-grade media measurement;
+- exact codec/container diagnostics;
+- saved evidence generation.
+
+The PWA must not claim to replace measurement capabilities it cannot reproduce at the evidence level required by AGENTS.md.
+
+## Pages deployment
+
+The current workflow publishes `shortcuts/img2video/` as the site root and PR snapshots under `/preview/pr-<number>/`.
+
+The previous preferred layout was:
+
+```text
+production: /pwa/
+preview:    /preview/pr-<number>/pwa/
+```
+
+That path layout remains mechanically useful, but the **security origin decision is still open**. If untrusted PR/fork content can share the same origin as the credential-bearing PWA, path separation is insufficient.
+
+Any future manifest/icons/Service Worker paths should remain relative, and Service Worker scope must not cross from preview into production.
 
 ## Update behavior
 
-The desired UX is simple: a new deployment should be acquired on a subsequent navigation/reload without a custom update banner.
+New deployments should be acquired through normal navigation/reload behavior without a custom update banner.
 
-If no Service Worker is used, normal HTTP/browser cache semantics handle this naturally.
-
-If a Service Worker is introduced later, its lifecycle and cache strategy must be designed so it does not trap users on stale application code. A Service Worker must not be added merely for the PWA label.
-
-## Icon plan
-
-Deferred until an icon direction is selected.
-
-When implemented, provide at least:
-
-- 192x192 PNG;
-- 512x512 PNG;
-- 512x512 maskable PNG where appropriate;
-- Apple touch icon metadata for Home Screen use.
-
-Do not embed large icon data directly into HTML.
+If a Service Worker is later justified by a concrete event-driven feature, its cache/lifecycle strategy must avoid trapping users on stale application code.
 
 ## Acceptance principles
 
-At every phase:
+At every stage:
 
 - existing `shortcuts/img2video/` continues to work;
 - existing `app/img2video_iphone.py` continues to work;
 - PWA failures cannot corrupt the working path;
-- secrets never enter the repository or public Pages output;
-- potentially billable API calls are deliberate;
-- browser limitations are documented rather than hidden by feature claims;
-- behavior is verified on a real HTTPS Pages deployment and target iPhone before declaring parity.
+- secrets never enter repository/public build assets;
+- potentially billable API calls are deliberate and recorded;
+- ambiguous creation is never silently retried;
+- browser/provider limitations are documented rather than hidden;
+- runtime claims are verified on the actual HTTPS origin and target iPhone before parity is declared.
