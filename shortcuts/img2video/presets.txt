@@ -1,0 +1,7 @@
+# VERSION$00057$ | Edited: 07/08 | TIME: 11:08
+# Img2Video built-in presets — compact preset library.
+# name|model|resolution|performance|fps|numFrames|priority|applyOptimizations|applyInterpolation|interpolationFps
+LTX Fast|ltx-2.3|480p|speed|24|120|3|false|false|24
+LTX Quality|ltx-2.3|1080p|quality|24|361|1|true|true|30
+Wan Fast|wan-2.2|480p|speed|16|96|3|false|false|24
+Wan Quality|wan-2.2|1080p|quality|16|160|1|true|true|30
