@@ -1,4 +1,4 @@
-<!-- VERSION$00007$ | Edited: 07/08 | TIME: 19:08 -->
+<!-- VERSION$00008$ | Edited: 07/08 | TIME: 19:29 -->
 # PWA Discovery and Planning
 
 This directory is the canonical home for discovery, architecture, security, and implementation planning for the future Img2Video Progressive Web App.
@@ -23,7 +23,8 @@ The existing runtime remains the behavioral reference during discovery. PWA work
 - [`background-execution-and-notifications.md`](background-execution-and-notifications.md) — Service Worker lifecycle, iOS background limitations, Web Push architecture, durable recovery, timers, chain-mode and download implications.
 - [`external-research-review.md`](external-research-review.md) — review of the user-supplied August 2026 iOS PWA background-execution research, including Declarative Web Push, Safari 26 installability, Wake Lock, foreground checkpoints, server-vs-device tradeoffs, and the resulting Img2Video recommendations.
 - [`python-runtime-parity.md`](python-runtime-parity.md) — direct comparison of the production Python state machine with browser/PWA equivalents, including foreground suspension semantics and remaining parity blockers.
-- [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, and the narrow webhook-to-push relay option.
+- [`reliability-boundaries.md`](reliability-boundaries.md) — first-class reliability analysis for the submission orphan window, result retention/URL TTL, storage persistence, wall-clock recovery, Wake Lock, CORS, and the narrow webhook-to-push relay option.
+- [`artworks-provider-capabilities.md`](artworks-provider-capabilities.md) — targeted review of the authenticated ArtWorks contract for CORS, idempotent creation, task discovery/listing, result retention/URL refresh, and webhook/callback support.
 - [`implementation-plan.md`](implementation-plan.md) — staged plan for creating the PWA without disturbing the working implementation.
 
 ## Current direction
@@ -65,7 +66,21 @@ The current background-execution recommendation is foreground-first orchestratio
 
 The August 2026 external research review reinforces that Background Sync, Periodic Background Sync, keep-alive timers, WebSockets, audio tricks, and Wake Lock do not provide dependable iOS background execution. Wake Lock may still be useful as an optional foreground UX feature. Classic Web Push can briefly wake a Service Worker but requires a visible notification; Declarative Web Push is preferable for pure notifications because it deliberately avoids JavaScript execution.
 
-Modern iOS Home Screen web apps can receive Web Push, but a server-side push sender and a meaningful external completion event are required. ArtWorks webhook/callback availability is currently unknown.
+Modern iOS Home Screen web apps can receive Web Push, but a server-side push sender and a meaningful external completion event are required.
+
+## ArtWorks provider capability status
+
+The authenticated ArtWorks OpenAPI snapshot currently available to the project narrows several provider questions:
+
+- **CORS/preflight:** still **Unknown**; OpenAPI does not define runtime CORS policy and the current research runtime could not reach the host to perform a meaningful preflight.
+- **Task-creation idempotency:** **Not documented**; no `Idempotency-Key`, deduplicating client request ID, or retry-safe creation semantics are exposed.
+- **Task listing/search:** **Not documented**; `/api/v3/tasks` exposes POST, while task retrieval is documented only by known ID at `/api/v3/tasks/{task}`.
+- **Tags:** documented for "categorization and filtering" and returned in task info, but no task-list/filter operation is exposed in the same contract.
+- **`batchId`:** documented for shared queue-priority behavior, not for idempotency or orphan discovery.
+- **Completed-task/media retention and result URL refresh:** still **Unknown**; no TTL/retention contract or saved real result URL suitable for expiry analysis was found.
+- **Webhook/callback registration:** **Not documented** in the current authenticated contract.
+
+"Not documented" is deliberately narrower than "does not exist". A newer/private/provider-support capability could still close the orphan or notification gaps and should be verified before concluding otherwise.
 
 ## Reliability boundaries
 
@@ -76,9 +91,11 @@ Foreground recovery solves interruptions only after a remote task ID has been du
 
 A local submission-intent record should be persisted before POST, but that record alone cannot prove whether an ambiguous request created a billable task. Blind automatic re-submission of an ambiguous intent is therefore prohibited until provider behavior closes that gap.
 
+Because ArtWorks tags are documented and returned with task info, a unique non-secret correlation tag per PWA step is a reasonable forward-compatible design option. It does not solve orphan recovery under the current documented API because no task-list/filter endpoint is exposed.
+
 Retry schedules, phase timers, priority-promotion thresholds, and timeouts must be reconstructed from persisted wall-clock timestamps after suspension rather than resumed from JavaScript tick counters.
 
-A narrow future relay remains possible without moving reusable ArtWorks credentials off-device: if ArtWorks can emit authenticated completion callbacks, a relay could map opaque task/correlation IDs to Web Push subscriptions and only notify the device. Webhook/callback availability remains unknown.
+A narrow future relay remains possible without moving reusable ArtWorks credentials off-device: if ArtWorks can emit authenticated completion callbacks, a relay could map opaque task/correlation IDs to Web Push subscriptions and only notify the device. Webhook/callback registration is not documented in the current provider contract.
 
 ## Credentials
 
@@ -147,8 +164,8 @@ Platform/provider claims in these documents should distinguish documented browse
 Unknowns must remain explicit. In particular, do not assume:
 
 - ArtWorks permits browser CORS until verified;
-- ArtWorks has or lacks a webhook until authoritative evidence is found;
-- ArtWorks supports task-creation idempotency or task listing/search until verified;
+- ArtWorks has or lacks a webhook beyond what the current authenticated contract documents;
+- ArtWorks supports task-creation idempotency or task listing/search beyond what the current authenticated contract documents;
 - completed ArtWorks task/result URLs remain retrievable for any particular duration until verified;
 - a Service Worker continues running after the app is backgrounded;
 - automatic iOS downloads behave like desktop Chrome;
